@@ -1,0 +1,23 @@
+# Dependencies
+/node_modules
+
+# Environment variables
+.env
+
+# Logs
+/logs
+
+# Generated files
+directory_structure.txt
+file_list.txt
+
+# Firebase
+/config/firebase-config.js
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/

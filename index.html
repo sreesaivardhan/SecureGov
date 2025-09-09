@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureGov - Digital Document Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+
+  
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <nav class="nav">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                SecureGov
+            </div>
+            <ul class="nav-links" id="navLinks">
+                <!-- Navigation will be populated by JavaScript -->
+            </ul>
+        </nav>
+    </div>
+
+    <div class="container">
+        <!-- Alerts -->
+        <div id="alertContainer"></div>
+
+        <!-- Login Screen -->
+        <div id="loginScreen" class="main-content active">
+            <div class="auth-container">
+                <h2 class="auth-title">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Login to SecureGov
+                </h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">Email Address</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn">
+                        <span id="loginBtnText">Login</span>
+                        <div id="loginLoader" class="loading hidden"></div>
+                    </button>
+                </form>
+                <div class="auth-switch">
+                    Don't have an account? <a href="#" onclick="showScreen('registerScreen')">Register here</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Register Screen -->
+        <div id="registerScreen" class="main-content">
+            <div class="auth-container">
+                <h2 class="auth-title">
+                    <i class="fas fa-user-plus"></i>
+                    Create Account
+                </h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="aadhaar">Aadhaar Number</label>
+                        <input type="text" id="aadhaar" pattern="[0-9]{12}" maxlength="12" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn">
+                        <span id="registerBtnText">Create Account</span>
+                        <div id="registerLoader" class="loading hidden"></div>
+                    </button>
+                </form>
+                <div class="auth-switch">
+                    Already have an account? <a href="#" onclick="showScreen('loginScreen')">Login here</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- OTP Verification Screen -->
+        <div id="otpScreen" class="main-content">
+            <div class="auth-container">
+                <h2 class="auth-title">
+                    <i class="fas fa-mobile-alt"></i>
+                    Verify OTP
+                </h2>
+                <p style="text-align: center; margin-bottom: 30px; color: #666;">
+                    Enter the OTP sent to your email/phone
+                </p>
+                <form id="otpForm">
+                    <div class="form-group">
+                        <label for="otpCode">OTP Code</label>
+                        <input type="text" id="otpCode" maxlength="6" pattern="[0-9]{6}" required>
+                    </div>
+                    <button type="submit" class="btn">
+                        <span id="otpBtnText">Verify OTP</span>
+                        <div id="otpLoader" class="loading hidden"></div>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="resendOTP()">
+                        Resend OTP
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboardScreen" class="main-content">
+            <div class="dashboard">
+                <div class="sidebar">
+                    <ul class="sidebar-menu">
+                        <li><a href="#" onclick="showDashboardSection('overview')" class="active">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a></li>
+                        <li><a href="#" onclick="showDashboardSection('documents')">
+                            <i class="fas fa-file-alt"></i> My Documents
+                        </a></li>
+                        <li><a href="#" onclick="showDashboardSection('upload')">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Document
+                        </a></li>
+                        <li><a href="#" onclick="showDashboardSection('shared')">
+                            <i class="fas fa-share-alt"></i> Shared Documents
+                        </a></li>
+                        <li><a href="#" onclick="showDashboardSection('family')">
+                            <i class="fas fa-users"></i> Family Members
+                        </a></li>
+                        <li><a href="#" onclick="showDashboardSection('profile')">
+                            <i class="fas fa-user-cog"></i> Profile
+                        </a></li>
+                        <li><a href="#" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a></li>
+                    </ul>
+                </div>
+
+                <div class="main-panel">
+                    <!-- Dashboard Overview -->
+                    <div id="overviewSection" class="dashboard-section active">
+                        <h2>Welcome to SecureGov Dashboard</h2>
+                        <p>Manage your important government documents securely.</p>
+                        
+                        <div class="document-grid" style="margin-top: 30px;">
+                            <div class="document-card">
+                                <div class="document-icon">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <div class="document-title">Total Documents</div>
+                                <div class="document-meta" id="totalDocs">0 documents</div>
+                            </div>
+                            <div class="document-card">
+                                <div class="document-icon">
+                                    <i class="fas fa-share-alt"></i>
+                                </div>
+                                <div class="document-title">Shared Documents</div>
+                                <div class="document-meta" id="sharedDocs">0 documents</div>
+                            </div>
+                            <div class="document-card">
+                                <div class="document-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="document-title">Family Members</div>
+                                <div class="document-meta" id="familyCount">0 members</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documents Section -->
+                    <div id="documentsSection" class="dashboard-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2>My Documents</h2>
+                            <button class="btn" style="width: auto; padding: 10px 20px;" onclick="showDashboardSection('upload')">
+                                <i class="fas fa-plus"></i> Add Document
+                            </button>
+                        </div>
+                        <div id="documentsGrid" class="document-grid">
+                            <!-- Documents will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Upload Section -->
+                    <div id="uploadSection" class="dashboard-section">
+                        <h2>Upload New Document</h2>
+                        <form id="uploadForm">
+                            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                                <div class="upload-icon">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <h3>Click to upload or drag and drop</h3>
+                                <p>PDF, JPG, PNG files only (Max 10MB)</p>
+                                <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="handleFileSelect(event)">
+                            </div>
+                            <div class="form-group">
+                                <label for="docType">Document Type</label>
+                                <select id="docType" required>
+                                    <option value="">Select Document Type</option>
+                                    <option value="aadhaar">Aadhaar Card</option>
+                                    <option value="pan">PAN Card</option>
+                                    <option value="passport">Passport</option>
+                                    <option value="license">Driving License</option>
+                                    <option value="marksheet">Mark Sheet</option>
+                                    <option value="certificate">Certificate</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="docName">Document Name</label>
+                                <input type="text" id="docName" placeholder="e.g., My Aadhaar Card" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="docDescription">Description (Optional)</label>
+                                <input type="text" id="docDescription" placeholder="Additional details about the document">
+                            </div>
+                            <button type="submit" class="btn">
+                                <span id="uploadBtnText">Upload Document</span>
+                                <div id="uploadLoader" class="loading hidden"></div>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Shared Documents Section -->
+                    <div id="sharedSection" class="dashboard-section">
+                        <h2>Shared Documents</h2>
+                        <div id="sharedGrid" class="document-grid">
+                            <!-- Shared documents will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Family Members Section -->
+                    <div id="familySection" class="dashboard-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2>Family Members</h2>
+                            <button class="btn" style="width: auto; padding: 10px 20px;" onclick="showModal('inviteFamilyModal')">
+                                <i class="fas fa-user-plus"></i> Invite Member
+                            </button>
+                        </div>
+                        <div id="familyGrid" class="document-grid">
+                            <!-- Family members will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Profile Section -->
+                    <div id="profileSection" class="dashboard-section">
+                        <h2>My Profile</h2>
+                        <form id="profileForm">
+                            <div class="form-group">
+                                <label for="profileName">Full Name</label>
+                                <input type="text" id="profileName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="profileEmail">Email Address</label>
+                                <input type="email" id="profileEmail" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="profilePhone">Phone Number</label>
+                                <input type="tel" id="profilePhone" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="profileAadhaar">Aadhaar Number</label>
+                                <input type="text" id="profileAadhaar" readonly>
+                            </div>
+                            <button type="submit" class="btn">
+                                Update Profile
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="shareModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Share Document</h3>
+                <button class="close-modal" onclick="hideModal('shareModal')">&times;</button>
+            </div>
+            <form id="shareForm">
+                <div class="form-group">
+                    <label for="shareEmail">Share with (Email)</label>
+                    <input type="email" id="shareEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="sharePermission">Permission Level</label>
+                    <select id="sharePermission" required>
+                        <option value="view">View Only</option>
+                        <option value="download">View & Download</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Share Document</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="inviteFamilyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Invite Family Member</h3>
+                <button class="close-modal" onclick="hideModal('inviteFamilyModal')">&times;</button>
+            </div>
+            <form id="inviteFamilyForm">
+                <div class="form-group">
+                    <label for="inviteEmail">Email Address</label>
+                    <input type="email" id="inviteEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="relationship">Relationship</label>
+                    <select id="relationship" required>
+                        <option value="">Select Relationship</option>
+                        <option value="spouse">Spouse</option>
+                        <option value="parent">Parent</option>
+                        <option value="child">Child</option>
+                        <option value="sibling">Sibling</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Send Invitation</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-storage-compat.min.js"></script>
+
+<script src="config/firebase-config.js"></script>
+<script src="js/app.js"></script>
+    
+</body>
+</html>
