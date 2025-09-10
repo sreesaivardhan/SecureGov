@@ -10,6 +10,7 @@
 # Generated files
 directory_structure.txt
 file_list.txt
+project-structure.txt
 
 # Firebase
 /config/firebase-config.js
