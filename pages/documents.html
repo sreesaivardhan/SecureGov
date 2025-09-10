@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Management - SecureGov</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/documents.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>SecureGov</span>
+                    </div>
+                    <nav class="nav">
+                        <a href="../index.html">Dashboard</a>
+                        <a href="../pages/documents.html" class="active">Documents</a>
+                        <a href="../pages/family.html">Family</a>
+                        <a href="../pages/profile.html">Profile</a>
+                        <a href="#" onclick="logout()">Logout</a>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <!-- Page Header -->
+                <div class="page-header">
+                    <h1><i class="fas fa-folder-open"></i> Document Management</h1>
+                    <button class="btn btn-primary" onclick="openUploadModal()">
+                        <i class="fas fa-plus"></i> Upload Document
+                    </button>
+                </div>
+
+                <!-- Statistics Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="totalDocs">0</h3>
+                            <p>Total Documents</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-share-alt"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="sharedDocs">0</h3>
+                            <p>Shared Documents</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="recentDocs">0</h3>
+                            <p>Recent Uploads</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="expiringDocs">0</h3>
+                            <p>Expiring Soon</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters and Search -->
+                <div class="filters-section">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput" placeholder="Search documents...">
+                    </div>
+                    <div class="filter-controls">
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                        </select>
+                        <select id="departmentFilter">
+                            <option value="">All Departments</option>
+                            <option value="citizen">Citizen</option>
+                            <option value="government">Government</option>
+                            <option value="municipal">Municipal</option>
+                            <option value="state">State</option>
+                            <option value="central">Central</option>
+                        </select>
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="verified">Verified</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="expired">Expired</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Documents Grid -->
+                <div class="documents-section">
+                    <div class="section-header">
+                        <h2>Your Documents</h2>
+                        <div class="view-controls">
+                            <button class="view-btn active" data-view="grid">
+                                <i class="fas fa-th"></i>
+                            </button>
+                            <button class="view-btn" data-view="list">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="documentsContainer" class="documents-grid">
+                        <!-- Documents will be loaded here -->
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="pagination" class="pagination">
+                        <!-- Pagination will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Upload Modal -->
+        <div id="uploadModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-upload"></i> Upload Document</h3>
+                    <button class="close-btn" onclick="closeUploadModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="documentFile">Select File *</label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="documentFile" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <div class="file-input-display">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <span>Choose file or drag here</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="documentTitle">Title *</label>
+                            <input type="text" id="documentTitle" name="title" autocomplete="off" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="documentCategory">Category *</label>
+                            <select id="documentCategory" name="category" required>
+                                <option value="">Select Category</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="documentDepartment">Department</label>
+                            <select id="documentDepartment" name="department">
+                                <option value="citizen">Citizen</option>
+                                <option value="government">Government</option>
+                                <option value="municipal">Municipal</option>
+                                <option value="state">State</option>
+                                <option value="central">Central</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="documentDescription">Description</label>
+                            <textarea id="documentDescription" name="description" rows="3" autocomplete="off"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="documentNumber">Document Number</label>
+                            <input type="text" id="documentNumber" name="documentNumber" autocomplete="off">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="issuingAuthority">Issuing Authority</label>
+                            <input type="text" id="issuingAuthority" name="issuingAuthority" autocomplete="organization">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="issueDate">Issue Date</label>
+                            <input type="date" id="issueDate" name="issueDate" autocomplete="off">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="expiryDate">Expiry Date</label>
+                            <input type="date" id="expiryDate" name="expiryDate" autocomplete="off">
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="documentTags">Tags (comma separated)</label>
+                            <input type="text" id="documentTags" name="tags" placeholder="e.g., important, personal, official" autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Upload Document
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Modal -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-edit"></i> Edit Document</h3>
+                    <button class="close-btn" onclick="closeEditModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="editForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="editTitle">Title *</label>
+                            <input type="text" id="editTitle" name="title" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editCategory">Category *</label>
+                            <select id="editCategory" name="category" required>
+                                <option value="">Select Category</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="editDescription">Description</label>
+                            <textarea id="editDescription" name="description" rows="3"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editDocumentNumber">Document Number</label>
+                            <input type="text" id="editDocumentNumber" name="documentNumber">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editIssuingAuthority">Issuing Authority</label>
+                            <input type="text" id="editIssuingAuthority" name="issuingAuthority">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editIssueDate">Issue Date</label>
+                            <input type="date" id="editIssueDate" name="issueDate">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editExpiryDate">Expiry Date</label>
+                            <input type="date" id="editExpiryDate" name="expiryDate">
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="editTags">Tags (comma separated)</label>
+                            <input type="text" id="editTags" name="tags">
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="loading-spinner">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-storage-compat.min.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "demo-key",
+            authDomain: "securegov-demo.firebaseapp.com",
+            projectId: "securegov-demo",
+            storageBucket: "securegov-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+    </script>
+    <script src="../js/documents.js"></script>
+</body>
+</html>

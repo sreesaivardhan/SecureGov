@@ -350,6 +350,19 @@ app.post('/api/share/:id', authenticateUser, async (req, res) => {
 });
 
 /* ---------------------------
+   Route handlers
+   --------------------------- */
+// Import route modules
+const documentsRouter = require('./routes/documents');
+const familyRouter = require('./routes/family');
+const profileRouter = require('./routes/profile');
+
+// Use routes
+app.use('/api/documents', documentsRouter);
+app.use('/api/family', familyRouter);
+app.use('/api/profile', profileRouter);
+
+/* ---------------------------
    Health & debug endpoints
    --------------------------- */
 app.get('/api/health', (req, res) => {

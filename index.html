@@ -17,9 +17,6 @@
                 <i class="fas fa-shield-alt"></i>
                 SecureGov
             </div>
-            <ul class="nav-links" id="navLinks">
-                <!-- Navigation will be populated by JavaScript -->
-            </ul>
         </nav>
     </div>
 
@@ -37,11 +34,11 @@
                 <form id="loginForm">
                     <div class="form-group">
                         <label for="loginEmail">Email Address</label>
-                        <input type="email" id="loginEmail" required>
+                        <input type="email" id="loginEmail" autocomplete="email" required>
                     </div>
                     <div class="form-group">
                         <label for="loginPassword">Password</label>
-                        <input type="password" id="loginPassword" required>
+                        <input type="password" id="loginPassword" autocomplete="current-password" required>
                     </div>
                     <button type="submit" class="btn">
                         <span id="loginBtnText">Login</span>
@@ -63,28 +60,28 @@
                 </h2>
                 <form id="registerForm">
                     <div class="form-group">
-                        <label for="fullName">Full Name</label>
-                        <input type="text" id="fullName" required>
+                        <label for="registerName">Full Name</label>
+                        <input type="text" id="registerName" autocomplete="name" required>
                     </div>
                     <div class="form-group">
-                        <label for="email">Email Address</label>
-                        <input type="email" id="email" required>
+                        <label for="registerEmail">Email Address</label>
+                        <input type="email" id="registerEmail" autocomplete="email" readonly>
                     </div>
                     <div class="form-group">
-                        <label for="phone">Phone Number</label>
-                        <input type="tel" id="phone" required>
+                        <label for="registerPhone">Phone Number</label>
+                        <input type="tel" id="registerPhone" autocomplete="tel" required>
                     </div>
                     <div class="form-group">
-                        <label for="aadhaar">Aadhaar Number</label>
-                        <input type="text" id="aadhaar" pattern="[0-9]{12}" maxlength="12" required>
+                        <label for="registerAadhaar">Aadhaar Number</label>
+                        <input type="text" id="registerAadhaar" autocomplete="off" readonly>
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" required>
+                        <input type="password" id="password" autocomplete="new-password" required>
                     </div>
                     <div class="form-group">
                         <label for="confirmPassword">Confirm Password</label>
-                        <input type="password" id="confirmPassword" required>
+                        <input type="password" id="confirmPassword" autocomplete="new-password" required>
                     </div>
                     <button type="submit" class="btn">
                         <span id="registerBtnText">Create Account</span>
@@ -110,7 +107,7 @@
                 <form id="otpForm">
                     <div class="form-group">
                         <label for="otpCode">OTP Code</label>
-                        <input type="text" id="otpCode" maxlength="6" pattern="[0-9]{6}" required>
+                        <input type="text" id="otpCode" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" required>
                     </div>
                     <button type="submit" class="btn">
                         <span id="otpBtnText">Verify OTP</span>
@@ -136,9 +133,6 @@
                         </a></li>
                         <li><a href="#" onclick="showDashboardSection('upload')">
                             <i class="fas fa-cloud-upload-alt"></i> Upload Document
-                        </a></li>
-                        <li><a href="#" onclick="showDashboardSection('shared')">
-                            <i class="fas fa-share-alt"></i> Shared Documents
                         </a></li>
                         <li><a href="#" onclick="showDashboardSection('family')">
                             <i class="fas fa-users"></i> Family Members
@@ -184,7 +178,7 @@
                     </div>
 
                     <!-- Documents Section -->
-                    <div id="documentsSection" class="dashboard-section">
+                    <div id="documentsSection" class="dashboard-section" style="display: none;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h2>My Documents</h2>
                             <button class="btn" style="width: auto; padding: 10px 20px;" onclick="showDashboardSection('upload')">
@@ -197,7 +191,7 @@
                     </div>
 
                     <!-- Upload Section -->
-                    <div id="uploadSection" class="dashboard-section">
+                    <div id="uploadSection" class="dashboard-section" style="display: none;">
                         <h2>Upload New Document</h2>
                         <form id="uploadForm">
                             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
@@ -210,7 +204,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="docType">Document Type</label>
-                                <select id="docType" required>
+                                <select id="docType" autocomplete="off" required>
                                     <option value="">Select Document Type</option>
                                     <option value="aadhaar">Aadhaar Card</option>
                                     <option value="pan">PAN Card</option>
@@ -223,11 +217,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="docName">Document Name</label>
-                                <input type="text" id="docName" placeholder="e.g., My Aadhaar Card" required>
+                                <input type="text" id="docName" placeholder="e.g., My Aadhaar Card" autocomplete="off" required>
                             </div>
                             <div class="form-group">
                                 <label for="docDescription">Description (Optional)</label>
-                                <input type="text" id="docDescription" placeholder="Additional details about the document">
+                                <input type="text" id="docDescription" placeholder="Additional details about the document" autocomplete="off">
                             </div>
                             <button type="submit" class="btn">
                                 <span id="uploadBtnText">Upload Document</span>
@@ -236,49 +230,49 @@
                         </form>
                     </div>
 
-                    <!-- Shared Documents Section -->
-                    <div id="sharedSection" class="dashboard-section">
+                    <!-- Shared Documents Section (Hidden by default) -->
+                    <div id="sharedSection" class="dashboard-section" style="display: none;">
                         <h2>Shared Documents</h2>
                         <div id="sharedGrid" class="document-grid">
-                            <!-- Shared documents will be populated here -->
+                            <p>Use the dedicated Documents page to view shared documents.</p>
                         </div>
                     </div>
 
-                    <!-- Family Members Section -->
-                    <div id="familySection" class="dashboard-section">
+                    <!-- Family Section -->
+                    <div id="familySection" class="dashboard-section" style="display: none;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h2>Family Members</h2>
-                            <button class="btn" style="width: auto; padding: 10px 20px;" onclick="showModal('inviteFamilyModal')">
-                                <i class="fas fa-user-plus"></i> Invite Member
+                            <button class="btn" style="width: auto; padding: 10px 20px;" onclick="addFamilyMember()">
+                                <i class="fas fa-plus"></i> Add Member
                             </button>
                         </div>
-                        <div id="familyGrid" class="document-grid">
+                        <div id="familyGrid" class="family-grid">
                             <!-- Family members will be populated here -->
                         </div>
                     </div>
 
                     <!-- Profile Section -->
-                    <div id="profileSection" class="dashboard-section">
+                    <div id="profileSection" class="dashboard-section" style="display: none;">
                         <h2>My Profile</h2>
-                        <form id="profileForm">
+                        <form id="profileForm" class="profile-form">
                             <div class="form-group">
                                 <label for="profileName">Full Name</label>
-                                <input type="text" id="profileName" required>
+                                <input type="text" id="profileName" autocomplete="name" required>
                             </div>
                             <div class="form-group">
                                 <label for="profileEmail">Email Address</label>
-                                <input type="email" id="profileEmail" readonly>
+                                <input type="email" id="profileEmail" autocomplete="email" readonly>
                             </div>
                             <div class="form-group">
                                 <label for="profilePhone">Phone Number</label>
-                                <input type="tel" id="profilePhone" required>
+                                <input type="tel" id="profilePhone" autocomplete="tel" required>
                             </div>
                             <div class="form-group">
                                 <label for="profileAadhaar">Aadhaar Number</label>
-                                <input type="text" id="profileAadhaar" readonly>
+                                <input type="text" id="profileAadhaar" autocomplete="off" readonly>
                             </div>
                             <button type="submit" class="btn">
-                                Update Profile
+                                <i class="fas fa-save"></i> Update Profile
                             </button>
                         </form>
                     </div>

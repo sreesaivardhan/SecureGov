@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - SecureGov</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/profile.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>SecureGov</span>
+                </div>
+                <nav class="nav">
+                    <a href="../index.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="documents.html" class="nav-link">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Documents</span>
+                    </a>
+                    <a href="family.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Family</span>
+                    </a>
+                    <a href="profile.html" class="nav-link active">
+                        <i class="fas fa-user-cog"></i>
+                        <span>Profile</span>
+                    </a>
+                    <a href="#" onclick="logout()" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </nav>
+                <div class="user-menu">
+                    <div class="user-avatar" id="userAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="profile.html" class="dropdown-item">
+                            <i class="fas fa-user"></i>
+                            Profile
+                        </a>
+                        <a href="#" class="dropdown-item" id="logoutBtn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar-section">
+                    <div class="profile-avatar" id="profileAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="changeAvatarBtn">
+                        <i class="fas fa-camera"></i>
+                        Change Photo
+                    </button>
+                    <input type="file" id="avatarInput" accept="image/*" style="display: none;">
+                </div>
+                <div class="profile-info">
+                    <h1 class="profile-name" id="profileName">Loading...</h1>
+                    <p class="profile-email" id="profileEmail">Loading...</p>
+                    <div class="profile-badges" id="profileBadges"></div>
+                </div>
+                <div class="profile-completion">
+                    <div class="completion-circle" id="completionCircle">
+                        <span class="completion-percentage" id="completionPercentage">0%</span>
+                    </div>
+                    <div class="completion-info">
+                        <h3>Profile Completion</h3>
+                        <p class="completion-level" id="completionLevel">Basic</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Navigation -->
+            <div class="profile-nav">
+                <button class="profile-nav-btn active" data-tab="personal">
+                    <i class="fas fa-user"></i>
+                    Personal Info
+                </button>
+                <button class="profile-nav-btn" data-tab="government">
+                    <i class="fas fa-id-card"></i>
+                    Government IDs
+                </button>
+                <button class="profile-nav-btn" data-tab="address">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Addresses
+                </button>
+                <button class="profile-nav-btn" data-tab="security">
+                    <i class="fas fa-shield-alt"></i>
+                    Security
+                </button>
+                <button class="profile-nav-btn" data-tab="activity">
+                    <i class="fas fa-history"></i>
+                    Activity
+                </button>
+            </div>
+
+            <!-- Profile Content -->
+            <div class="profile-content">
+                <!-- Personal Information Tab -->
+                <div class="profile-tab active" id="personalTab">
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>Personal Information</h2>
+                            <button class="btn btn-primary" id="editPersonalBtn">
+                                <i class="fas fa-edit"></i>
+                                Edit
+                            </button>
+                        </div>
+                        <form class="profile-form" id="personalForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="firstName">First Name *</label>
+                                    <input type="text" id="firstName" name="firstName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lastName">Last Name *</label>
+                                    <input type="text" id="lastName" name="lastName" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="middleName">Middle Name</label>
+                                    <input type="text" id="middleName" name="middleName">
+                                </div>
+                                <div class="form-group">
+                                    <label for="displayName">Display Name</label>
+                                    <input type="text" id="displayName" name="displayName">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="dateOfBirth">Date of Birth</label>
+                                    <input type="date" id="dateOfBirth" name="dateOfBirth">
+                                </div>
+                                <div class="form-group">
+                                    <label for="gender">Gender</label>
+                                    <select id="gender" name="gender">
+                                        <option value="">Select Gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                        <option value="prefer_not_to_say">Prefer not to say</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="nationality">Nationality</label>
+                                    <input type="text" id="nationality" name="nationality" value="Indian">
+                                </div>
+                                <div class="form-group">
+                                    <label for="occupation">Occupation</label>
+                                    <input type="text" id="occupation" name="occupation">
+                                </div>
+                            </div>
+                            <div class="form-actions" style="display: none;">
+                                <button type="button" class="btn btn-secondary" id="cancelPersonalBtn">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Government IDs Tab -->
+                <div class="profile-tab" id="governmentTab">
+                    <!-- Aadhaar Section -->
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>Aadhaar Card</h2>
+                            <div class="verification-status" id="aadhaarStatus">
+                                <span class="status-badge status-not-linked">Not Linked</span>
+                            </div>
+                        </div>
+                        <div class="id-card aadhaar-card">
+                            <div class="id-card-content">
+                                <div class="id-info">
+                                    <h3>Aadhaar Number</h3>
+                                    <p class="id-number" id="aadhaarNumber">Not linked</p>
+                                    <div class="id-actions">
+                                        <button class="btn btn-primary" id="linkAadhaarBtn">
+                                            <i class="fas fa-link"></i>
+                                            Link Aadhaar
+                                        </button>
+                                        <button class="btn btn-success" id="verifyAadhaarBtn" style="display: none;">
+                                            <i class="fas fa-check"></i>
+                                            Verify
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="id-icon">
+                                    <i class="fas fa-id-card"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PAN Section -->
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>PAN Card</h2>
+                            <div class="verification-status" id="panStatus">
+                                <span class="status-badge status-not-linked">Not Added</span>
+                            </div>
+                        </div>
+                        <div class="id-card pan-card">
+                            <div class="id-card-content">
+                                <div class="id-info">
+                                    <h3>PAN Number</h3>
+                                    <p class="id-number" id="panNumber">Not added</p>
+                                    <div class="id-actions">
+                                        <button class="btn btn-primary" id="addPanBtn">
+                                            <i class="fas fa-plus"></i>
+                                            Add PAN
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="id-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other IDs Section -->
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>Other Government IDs</h2>
+                        </div>
+                        <div class="other-ids">
+                            <div class="id-item">
+                                <div class="id-item-info">
+                                    <h4>Passport</h4>
+                                    <p id="passportNumber">Not added</p>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="addPassportBtn">Add</button>
+                            </div>
+                            <div class="id-item">
+                                <div class="id-item-info">
+                                    <h4>Driving License</h4>
+                                    <p id="dlNumber">Not added</p>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="addDlBtn">Add</button>
+                            </div>
+                            <div class="id-item">
+                                <div class="id-item-info">
+                                    <h4>Voter ID</h4>
+                                    <p id="voterIdNumber">Not added</p>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="addVoterIdBtn">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Address Tab -->
+                <div class="profile-tab" id="addressTab">
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>Addresses</h2>
+                            <button class="btn btn-primary" id="addAddressBtn">
+                                <i class="fas fa-plus"></i>
+                                Add Address
+                            </button>
+                        </div>
+                        <div class="addresses-list" id="addressesList">
+                            <div class="empty-state">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <h3>No addresses added</h3>
+                                <p>Add your addresses to complete your profile</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Tab -->
+                <div class="profile-tab" id="securityTab">
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>Security Settings</h2>
+                        </div>
+                        <div class="security-settings">
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <h4>Two-Factor Authentication</h4>
+                                    <p>Add an extra layer of security to your account</p>
+                                </div>
+                                <div class="security-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="twoFactorToggle">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <h4>Login Notifications</h4>
+                                    <p>Get notified when someone logs into your account</p>
+                                </div>
+                                <div class="security-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="loginNotificationsToggle" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <h4>Document Access Notifications</h4>
+                                    <p>Get notified when your documents are accessed</p>
+                                </div>
+                                <div class="security-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="documentNotificationsToggle" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <h4>Session Timeout</h4>
+                                    <p>Automatically log out after inactivity</p>
+                                </div>
+                                <div class="security-control">
+                                    <select id="sessionTimeoutSelect">
+                                        <option value="5">5 minutes</option>
+                                        <option value="15">15 minutes</option>
+                                        <option value="30" selected>30 minutes</option>
+                                        <option value="60">1 hour</option>
+                                        <option value="120">2 hours</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="security-questions-section">
+                            <div class="section-header">
+                                <h3>Security Questions</h3>
+                                <button class="btn btn-primary" id="setupSecurityQuestionsBtn">
+                                    <i class="fas fa-key"></i>
+                                    Setup Questions
+                                </button>
+                            </div>
+                            <div class="security-questions-list" id="securityQuestionsList">
+                                <p class="text-muted">No security questions set up</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Tab -->
+                <div class="profile-tab" id="activityTab">
+                    <div class="profile-section">
+                        <div class="section-header">
+                            <h2>Recent Activity</h2>
+                            <button class="btn btn-secondary" id="refreshActivityBtn">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh
+                            </button>
+                        </div>
+                        <div class="activity-list" id="activityList">
+                            <div class="loading-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                Loading activity...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Aadhaar Link Modal -->
+    <div class="modal" id="aadhaarModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Link Aadhaar Number</h3>
+                <button class="modal-close" data-modal="aadhaarModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="aadhaarForm">
+                    <div class="form-group">
+                        <label for="aadhaarInput">Aadhaar Number</label>
+                        <input type="text" id="aadhaarInput" placeholder="Enter 12-digit Aadhaar number" maxlength="12">
+                        <small class="form-help">Enter your 12-digit Aadhaar number without spaces</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-modal="aadhaarModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Link Aadhaar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aadhaar Verification Modal -->
+    <div class="modal" id="aadhaarVerificationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Verify Aadhaar</h3>
+                <button class="modal-close" data-modal="aadhaarVerificationModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="verification-info">
+                    <p>An OTP has been sent to your registered mobile number</p>
+                    <p class="masked-number" id="maskedAadhaar"></p>
+                </div>
+                <form id="aadhaarVerificationForm">
+                    <div class="form-group">
+                        <label for="otpInput">Enter OTP</label>
+                        <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" maxlength="6">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-modal="aadhaarVerificationModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Verify</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAN Modal -->
+    <div class="modal" id="panModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add PAN Details</h3>
+                <button class="modal-close" data-modal="panModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="panForm">
+                    <div class="form-group">
+                        <label for="panInput">PAN Number</label>
+                        <input type="text" id="panInput" placeholder="Enter PAN number (e.g., ABCDE1234F)" maxlength="10" style="text-transform: uppercase;">
+                        <small class="form-help">Enter your 10-character PAN number</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-modal="panModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add PAN</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Address Modal -->
+    <div class="modal" id="addressModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="addressModalTitle">Add Address</h3>
+                <button class="modal-close" data-modal="addressModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addressForm">
+                    <div class="form-group">
+                        <label for="addressType">Address Type *</label>
+                        <select id="addressType" name="type" required>
+                            <option value="">Select Type</option>
+                            <option value="permanent">Permanent</option>
+                            <option value="current">Current</option>
+                            <option value="office">Office</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="addressLine1">Address Line 1 *</label>
+                        <input type="text" id="addressLine1" name="addressLine1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="addressLine2">Address Line 2</label>
+                        <input type="text" id="addressLine2" name="addressLine2">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="city">City *</label>
+                            <input type="text" id="city" name="city" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="state">State *</label>
+                            <input type="text" id="state" name="state" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="pincode">PIN Code *</label>
+                            <input type="text" id="pincode" name="pincode" pattern="[1-9][0-9]{5}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <input type="text" id="country" name="country" value="India">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-modal="addressModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Address</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Questions Modal -->
+    <div class="modal" id="securityQuestionsModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Setup Security Questions</h3>
+                <button class="modal-close" data-modal="securityQuestionsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Set up security questions to help recover your account if needed. Choose questions only you would know the answer to.</p>
+                <form id="securityQuestionsForm">
+                    <div class="security-question-item">
+                        <div class="form-group">
+                            <label>Security Question 1 *</label>
+                            <select name="question1" required>
+                                <option value="">Select a question</option>
+                                <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                                <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                                <option value="What was the name of your first school?">What was the name of your first school?</option>
+                                <option value="What city were you born in?">What city were you born in?</option>
+                                <option value="What is your favorite book?">What is your favorite book?</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Answer *</label>
+                            <input type="text" name="answer1" required>
+                        </div>
+                    </div>
+                    <div class="security-question-item">
+                        <div class="form-group">
+                            <label>Security Question 2 *</label>
+                            <select name="question2" required>
+                                <option value="">Select a question</option>
+                                <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                                <option value="What is the name of your best friend?">What is the name of your best friend?</option>
+                                <option value="What was your first car model?">What was your first car model?</option>
+                                <option value="What is your favorite movie?">What is your favorite movie?</option>
+                                <option value="What street did you grow up on?">What street did you grow up on?</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Answer *</label>
+                            <input type="text" name="answer2" required>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-modal="securityQuestionsModal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Questions</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-storage-compat.min.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "demo-key",
+            authDomain: "securegov-demo.firebaseapp.com",
+            projectId: "securegov-demo",
+            storageBucket: "securegov-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+    </script>
+    <script src="../js/profile.js"></script>
+</body>
+</html>

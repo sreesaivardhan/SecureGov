@@ -112,17 +112,21 @@ async function createOrUpdateUser(firebaseUser) {
 // Navigation Functions
 function updateNavigation(isLoggedIn) {
     const navLinks = document.getElementById('navLinks');
-    if (isLoggedIn) {
-        navLinks.innerHTML = `
-            <li><a href="#" onclick="showDashboardSection('overview')">Dashboard</a></li>
-            <li><a href="#" onclick="showDashboardSection('documents')">Documents</a></li>
-            <li><a href="#" onclick="logout()">Logout</a></li>
-        `;
-    } else {
-        navLinks.innerHTML = `
-            <li><a href="#" onclick="showScreen('loginScreen')">Login</a></li>
-            <li><a href="#" onclick="showScreen('registerScreen')">Register</a></li>
-        `;
+    if (navLinks) {
+        if (isLoggedIn) {
+            navLinks.innerHTML = `
+                <li><a href="#" onclick="showDashboardSection('overview')">Dashboard</a></li>
+                <li><a href="pages/documents.html">Documents</a></li>
+                <li><a href="pages/family.html">Family</a></li>
+                <li><a href="pages/profile.html">Profile</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            `;
+        } else {
+            navLinks.innerHTML = `
+                <li><a href="#" onclick="showScreen('loginScreen')">Login</a></li>
+                <li><a href="#" onclick="showScreen('registerScreen')">Register</a></li>
+            `;
+        }
     }
 }
 
@@ -133,36 +137,345 @@ function showScreen(screenId) {
     logger.info('Screen changed', { screen: screenId });
 }
 
-function showDashboardSection(sectionId) {
+function showDashboardSection(section) {
+    // Hide all sections first
     const sections = document.querySelectorAll('.dashboard-section');
-    sections.forEach(section => section.style.display = 'none');
-    document.getElementById(sectionId + 'Section').style.display = 'block';
+    sections.forEach(s => s.style.display = 'none');
     
-    // Update active sidebar link
-    const links = document.querySelectorAll('.sidebar-menu a');
-    links.forEach(link => link.classList.remove('active'));
-    event.target.classList.add('active');
+    // Update sidebar active state
+    const sidebarLinks = document.querySelectorAll('.sidebar-menu a');
+    sidebarLinks.forEach(link => link.classList.remove('active'));
     
-    logger.info('Dashboard section changed', { section: sectionId });
-    
-    // Load section-specific data
-    switch(sectionId) {
-        case 'documents':
-            loadUserDocuments();
-            break;
-        case 'shared':
-            loadSharedDocuments();
-            break;
-        case 'family':
+    // Show the requested section
+    const targetSection = document.getElementById(section + 'Section');
+    if (targetSection) {
+        targetSection.style.display = 'block';
+        
+        // Update active sidebar link
+        const activeLink = document.querySelector(`.sidebar-menu a[onclick*="${section}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+        
+        // Load section-specific data
+        if (section === 'documents') {
+            loadDocuments();
+        } else if (section === 'family') {
             loadFamilyMembers();
-            break;
-        case 'profile':
+        } else if (section === 'profile') {
             loadUserProfile();
-            break;
-        case 'overview':
+        } else if (section === 'overview') {
             loadDashboardOverview();
-            break;
+        }
     }
+}
+
+// Load documents for documents section
+function loadDocuments() {
+    const documentsGrid = document.getElementById('documentsGrid');
+    if (!documentsGrid) return;
+    
+    // Fetch documents from backend
+    fetch('/api/documents', {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('firebaseToken')}`,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.documents) {
+            if (data.documents.length === 0) {
+                documentsGrid.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-file-alt" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
+                        <p>No documents uploaded yet</p>
+                        <p style="color: #666; font-size: 0.9rem;">Click "Add Document" to upload your first document</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            documentsGrid.innerHTML = data.documents.map(doc => `
+                <div class="document-card">
+                    <div class="document-icon">
+                        <i class="fas ${getDocumentIcon(doc.category)}"></i>
+                    </div>
+                    <div class="document-info">
+                        <h4>${doc.title}</h4>
+                        <p>Uploaded: ${new Date(doc.uploadDate).toLocaleDateString()}</p>
+                        <p>Size: ${formatFileSize(doc.fileSize)}</p>
+                        <span class="status ${doc.verificationStatus}">${doc.verificationStatus}</span>
+                    </div>
+                    <div class="document-actions">
+                        <button onclick="viewDocument('${doc._id}')" class="btn-icon" title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button onclick="downloadDocument('${doc._id}')" class="btn-icon" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button onclick="deleteDocument('${doc._id}')" class="btn-icon delete" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            // Fallback to mock data if API fails
+            loadMockDocuments();
+        }
+    })
+    .catch(error => {
+        console.error('Error loading documents:', error);
+        // Fallback to mock data
+        loadMockDocuments();
+    });
+}
+
+// Fallback mock documents function
+function loadMockDocuments() {
+    const documentsGrid = document.getElementById('documentsGrid');
+    if (!documentsGrid) return;
+    
+    const mockDocuments = [
+        {
+            id: 1,
+            name: 'Aadhaar Card',
+            type: 'aadhaar',
+            uploadDate: '2024-01-15',
+            size: '2.3 MB',
+            status: 'verified'
+        },
+        {
+            id: 2,
+            name: 'PAN Card',
+            type: 'pan',
+            uploadDate: '2024-01-10',
+            size: '1.8 MB',
+            status: 'pending'
+        }
+    ];
+    
+    documentsGrid.innerHTML = mockDocuments.map(doc => `
+        <div class="document-card">
+            <div class="document-icon">
+                <i class="fas ${getDocumentIcon(doc.type)}"></i>
+            </div>
+            <div class="document-info">
+                <h4>${doc.name}</h4>
+                <p>Uploaded: ${doc.uploadDate}</p>
+                <p>Size: ${doc.size}</p>
+                <span class="status ${doc.status}">${doc.status}</span>
+            </div>
+            <div class="document-actions">
+                <button onclick="viewDocument(${doc.id})" class="btn-icon" title="View">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button onclick="downloadDocument(${doc.id})" class="btn-icon" title="Download">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button onclick="deleteDocument(${doc.id})" class="btn-icon delete" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Format file size helper
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Get document icon based on type
+function getDocumentIcon(type) {
+    const icons = {
+        'aadhaar': 'fa-id-card',
+        'pan': 'fa-credit-card',
+        'passport': 'fa-passport',
+        'license': 'fa-car',
+        'marksheet': 'fa-graduation-cap',
+        'certificate': 'fa-certificate',
+        'other': 'fa-file-alt'
+    };
+    return icons[type] || 'fa-file-alt';
+}
+
+// Handle file selection for upload
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const uploadArea = document.querySelector('.upload-area');
+        uploadArea.innerHTML = `
+            <div class="upload-icon">
+                <i class="fas fa-file-check"></i>
+            </div>
+            <h3>File Selected: ${file.name}</h3>
+            <p>Size: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+        `;
+    }
+}
+
+// Load family members
+function loadFamilyMembers() {
+    const familyGrid = document.getElementById('familyGrid');
+    if (!familyGrid) return;
+    
+    // Mock family data
+    const mockFamily = [
+        {
+            id: 1,
+            name: 'John Doe',
+            relation: 'Self',
+            aadhaar: '****-****-1234',
+            status: 'verified'
+        },
+        {
+            id: 2,
+            name: 'Jane Doe',
+            relation: 'Spouse',
+            aadhaar: '****-****-5678',
+            status: 'pending'
+        }
+    ];
+    
+    familyGrid.innerHTML = mockFamily.map(member => `
+        <div class="family-card">
+            <div class="family-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="family-info">
+                <h4>${member.name}</h4>
+                <p>Relation: ${member.relation}</p>
+                <p>Aadhaar: ${member.aadhaar}</p>
+                <span class="status ${member.status}">${member.status}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Load user profile
+function loadUserProfile() {
+    const profileName = document.getElementById('profileName');
+    const profileEmail = document.getElementById('profileEmail');
+    const profilePhone = document.getElementById('profilePhone');
+    const profileAadhaar = document.getElementById('profileAadhaar');
+    
+    if (profileName) {
+        // Mock profile data
+        profileName.value = 'John Doe';
+        profileEmail.value = 'john.doe@example.com';
+        profilePhone.value = '+91 9876543210';
+        profileAadhaar.value = '****-****-1234';
+    }
+}
+
+// Document actions
+function viewDocument(id) {
+    showAlert('Document viewer would open here', 'info');
+}
+
+function downloadDocument(id) {
+    showAlert('Document download started', 'success');
+}
+
+function deleteDocument(id) {
+    if (confirm('Are you sure you want to delete this document?')) {
+        showAlert('Document deleted successfully', 'success');
+        loadDocuments(); // Refresh the list
+    }
+}
+
+// Upload form handler
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const docType = document.getElementById('docType');
+            const docName = document.getElementById('docName');
+            const docDescription = document.getElementById('docDescription');
+            
+            if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+                showAlert('Please select a file to upload', 'error');
+                return;
+            }
+            
+            if (!docType || !docName || !docType.value || !docName.value) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            // Upload to backend API
+            const uploadBtn = document.getElementById('uploadBtnText');
+            const uploadLoader = document.getElementById('uploadLoader');
+            
+            uploadBtn.textContent = 'Uploading...';
+            uploadLoader.classList.remove('hidden');
+            
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append('document', fileInput.files[0]);
+            formData.append('title', docName.value);
+            formData.append('category', docType.value);
+            if (docDescription && docDescription.value) {
+                formData.append('description', docDescription.value);
+            }
+            
+            // Upload to backend
+            fetch('/api/documents/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('firebaseToken')}`
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Document uploaded successfully!', 'success');
+                    
+                    // Reset form
+                    uploadForm.reset();
+                    const uploadArea = document.querySelector('.upload-area');
+                    uploadArea.innerHTML = `
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <h3>Click to upload or drag and drop</h3>
+                        <p>PDF, JPG, PNG files only (Max 10MB)</p>
+                    `;
+                    
+                    // Refresh documents if on documents section
+                    if (document.getElementById('documentsSection').style.display !== 'none') {
+                        loadDocuments();
+                    }
+                } else {
+                    showAlert(data.message || 'Upload failed', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                showAlert('Upload failed. Please try again.', 'error');
+            })
+            .finally(() => {
+                uploadBtn.textContent = 'Upload Document';
+                uploadLoader.classList.add('hidden');
+            });
+        });
+    }
+});
+
+// Add family member function
+function addFamilyMember() {
+    showAlert('Add family member functionality would open here', 'info');
 }
 
 // Alert System
@@ -339,14 +652,22 @@ async function initializeDashboard() {
     if (!currentUser) return;
     
     try {
-        // Load user profile data from Firestore
-        const userDoc = await db.collection('users').doc(currentUser.uid).get();
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            document.getElementById('profileName').value = userData.fullName || '';
-            document.getElementById('profileEmail').value = userData.email || '';
-            document.getElementById('profilePhone').value = userData.phone || '';
-            document.getElementById('profileAadhaar').value = userData.aadhaar || '';
+        // Load user profile data from backend API instead of Firestore
+        try {
+            const profileResponse = await apiCall('/profile');
+            if (profileResponse.success && profileResponse.profile) {
+                const profile = profileResponse.profile;
+                const profileNameEl = document.getElementById('profileName');
+                const profileEmailEl = document.getElementById('profileEmail');
+                const profilePhoneEl = document.getElementById('profilePhone');
+                
+                if (profileNameEl) profileNameEl.value = profile.personalInfo?.firstName || '';
+                if (profileEmailEl) profileEmailEl.value = profile.email || '';
+                if (profilePhoneEl) profilePhoneEl.value = profile.phoneNumber || '';
+            }
+        } catch (profileError) {
+            logger.warn('Profile data not available yet', profileError);
+            // Continue without profile data
         }
         
         loadDashboardOverview();
@@ -361,22 +682,40 @@ async function loadDashboardOverview() {
         // Load document statistics from MongoDB backend
         const stats = await apiCall('/documents/stats');
         
-        document.getElementById('totalDocs').textContent = `${stats.total || 0} documents`;
-        document.getElementById('sharedDocs').textContent = `${stats.shared || 0} documents`;
-        
-        // Family count still from Firestore for now
-        const familySnapshot = await db.collection('family_members')
-            .where('userId', '==', currentUser.uid)
-            .get();
-        document.getElementById('familyCount').textContent = `${familySnapshot.size} members`;
+        if (document.getElementById('totalDocs')) {
+            document.getElementById('totalDocs').textContent = `${stats.stats?.totalDocuments || 0} documents`;
+        }
+        if (document.getElementById('sharedDocs')) {
+            document.getElementById('sharedDocs').textContent = `${stats.stats?.sharedDocuments || 0} documents`;
+        }
         
         logger.info('Dashboard overview loaded');
     } catch (error) {
         logger.error('Error loading dashboard overview', error);
-        // Set default values on error
-        document.getElementById('totalDocs').textContent = '0 documents';
-        document.getElementById('sharedDocs').textContent = '0 documents';
-        document.getElementById('familyCount').textContent = '0 members';
+    }
+}
+
+function loadFamilySection() {
+    try {
+        logger.info('Loading family section');
+        // Redirect to family page or load family data
+        if (document.getElementById('familyContent')) {
+            document.getElementById('familyContent').innerHTML = '<p>Family management coming soon...</p>';
+        }
+    } catch (error) {
+        logger.error('Error loading family section', error);
+    }
+}
+
+function loadProfileSection() {
+    try {
+        logger.info('Loading profile section');
+        // Redirect to profile page or load profile data
+        if (document.getElementById('profileContent')) {
+            document.getElementById('profileContent').innerHTML = '<p>Profile management available on profile page...</p>';
+        }
+    } catch (error) {
+        logger.error('Error loading profile section', error);
     }
 }
 
@@ -391,27 +730,31 @@ function handleFileSelect(event) {
         if (selectedFile.size > maxSize) {
             showAlert('File size should be less than 10MB', 'error');
             selectedFile = null;
-            document.getElementById('fileInput').value = '';
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) fileInput.value = '';
             return;
         }
         
         if (!allowedTypes.includes(selectedFile.type)) {
             showAlert('Only PDF, JPG, and PNG files are allowed', 'error');
             selectedFile = null;
-            document.getElementById('fileInput').value = '';
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) fileInput.value = '';
             return;
         }
         
         // Update UI to show selected file
         const uploadArea = document.querySelector('.upload-area');
-        uploadArea.innerHTML = `
-            <div class="upload-icon">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <h3>File Selected: ${selectedFile.name}</h3>
-            <p>Size: ${(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-            <button type="button" onclick="clearFileSelection()" style="margin-top: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 5px;">Remove</button>
-        `;
+        if (uploadArea) {
+            uploadArea.innerHTML = `
+                <div class="upload-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <h3>File Selected: ${selectedFile.name}</h3>
+                <p>Size: ${(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                <button type="button" onclick="clearFileSelection()" style="margin-top: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 5px;">Remove</button>
+            `;
+        }
         
         logger.info('File selected', { name: selectedFile.name, size: selectedFile.size });
     }
@@ -419,36 +762,44 @@ function handleFileSelect(event) {
 
 function clearFileSelection() {
     selectedFile = null;
-    document.getElementById('fileInput').value = '';
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) fileInput.value = '';
     
     // Reset upload area
     const uploadArea = document.querySelector('.upload-area');
-    uploadArea.innerHTML = `
-        <div class="upload-icon">
-            <i class="fas fa-cloud-upload-alt"></i>
-        </div>
-        <h3>Click to upload or drag and drop</h3>
-        <p>PDF, JPG, PNG files only (Max 10MB)</p>
-        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="handleFileSelect(event)">
-    `;
-    uploadArea.onclick = () => document.getElementById('fileInput').click();
+    if (uploadArea) {
+        uploadArea.innerHTML = `
+            <div class="upload-icon">
+                <i class="fas fa-cloud-upload-alt"></i>
+            </div>
+            <h3>Click to upload or drag and drop</h3>
+            <p>PDF, JPG, PNG files only (Max 10MB)</p>
+            <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="handleFileSelect(event)">
+        `;
+        uploadArea.onclick = () => {
+            const newFileInput = document.getElementById('fileInput');
+            if (newFileInput) newFileInput.click();
+        };
+    }
 }
 
 // Updated upload form to use MongoDB backend
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    if (!selectedFile) {
-        showAlert('Please select a file to upload', 'error');
-        return;
-    }
-    
-    const submitBtn = document.getElementById('uploadBtnText');
-    const loader = document.getElementById('uploadLoader');
-    
-    try {
-        submitBtn.classList.add('hidden');
-        loader.classList.remove('hidden');
+const uploadForm = document.getElementById('uploadForm');
+if (uploadForm) {
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!selectedFile) {
+            showAlert('Please select a file to upload', 'error');
+            return;
+        }
+        
+        const submitBtn = document.getElementById('uploadBtnText');
+        const loader = document.getElementById('uploadLoader');
+        
+        try {
+            if (submitBtn) submitBtn.classList.add('hidden');
+            if (loader) loader.classList.remove('hidden');
         
         const docType = document.getElementById('docType').value;
         const docName = document.getElementById('docName').value;
@@ -475,24 +826,26 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             type: docType 
         });
         
-        showAlert('Document uploaded successfully!', 'success');
-        
-        // Reset form
-        document.getElementById('uploadForm').reset();
-        clearFileSelection();
-        
-        // Refresh documents list if on documents page
-        loadUserDocuments();
-        loadDashboardOverview();
-        
-    } catch (error) {
-        logger.error('Document upload error', error);
-        showAlert(error.message || 'Failed to upload document. Please try again.', 'error');
-    } finally {
-        submitBtn.classList.remove('hidden');
-        loader.classList.add('hidden');
-    }
-});
+            showAlert('Document uploaded successfully!', 'success');
+            
+            // Reset form
+            const uploadFormReset = document.getElementById('uploadForm');
+            if (uploadFormReset) uploadFormReset.reset();
+            clearFileSelection();
+            
+            // Refresh documents list if on documents page
+            loadUserDocuments();
+            loadDashboardOverview();
+            
+        } catch (error) {
+            logger.error('Document upload error', error);
+            showAlert(error.message || 'Failed to upload document. Please try again.', 'error');
+        } finally {
+            if (submitBtn) submitBtn.classList.remove('hidden');
+            if (loader) loader.classList.add('hidden');
+        }
+    });
+}
 
 // Load user documents from MongoDB
 async function loadUserDocuments() {

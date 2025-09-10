@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Groups - SecureGov</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/family.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>SecureGov</span>
+                    </div>
+                    <nav class="nav">
+                        <a href="../index.html">Dashboard</a>
+                        <a href="../pages/documents.html">Documents</a>
+                        <a href="../pages/family.html" class="active">Family</a>
+                        <a href="../pages/profile.html">Profile</a>
+                        <a href="#" onclick="logout()">Logout</a>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <!-- Page Header -->
+                <div class="page-header">
+                    <h1><i class="fas fa-users"></i> Family Groups</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="checkPendingInvitations()">
+                            <i class="fas fa-envelope"></i> 
+                            Invitations 
+                            <span id="invitationBadge" class="badge">0</span>
+                        </button>
+                        <button class="btn btn-primary" onclick="openCreateGroupModal()">
+                            <i class="fas fa-plus"></i> Create Family Group
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pending Invitations Alert -->
+                <div id="pendingInvitationsAlert" class="alert alert-info" style="display: none;">
+                    <div class="alert-content">
+                        <i class="fas fa-info-circle"></i>
+                        <span>You have pending family group invitations!</span>
+                        <button class="btn btn-sm btn-primary" onclick="showPendingInvitations()">
+                            View Invitations
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Family Groups Grid -->
+                <div class="family-groups-section">
+                    <div id="familyGroupsContainer" class="family-groups-grid">
+                        <!-- Family groups will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Create Family Group Modal -->
+        <div id="createGroupModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-users"></i> Create Family Group</h3>
+                    <button class="close-btn" onclick="closeCreateGroupModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label for="groupName">Group Name *</label>
+                        <input type="text" id="groupName" name="name" required maxlength="100">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="groupDescription">Description</label>
+                        <textarea id="groupDescription" name="description" rows="3" maxlength="500"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Group Settings</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="allowMemberInvites" name="allowMemberInvites">
+                                <span class="checkmark"></span>
+                                Allow members to invite others
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="autoAcceptInvites" name="autoAcceptInvites">
+                                <span class="checkmark"></span>
+                                Auto-accept invitations
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="maxMembers">Maximum Members</label>
+                        <input type="number" id="maxMembers" name="maxMembers" min="2" max="50" value="10">
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateGroupModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create Group
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Family Group Details Modal -->
+        <div id="groupDetailsModal" class="modal">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3 id="groupDetailsTitle"><i class="fas fa-users"></i> Family Group Details</h3>
+                    <button class="close-btn" onclick="closeGroupDetailsModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="group-details-tabs">
+                        <button class="tab-btn active" data-tab="members">
+                            <i class="fas fa-users"></i> Members
+                        </button>
+                        <button class="tab-btn" data-tab="invitations">
+                            <i class="fas fa-envelope"></i> Invitations
+                        </button>
+                        <button class="tab-btn" data-tab="settings">
+                            <i class="fas fa-cog"></i> Settings
+                        </button>
+                    </div>
+
+                    <!-- Members Tab -->
+                    <div id="membersTab" class="tab-content active">
+                        <div class="tab-header">
+                            <h4>Family Members</h4>
+                            <button class="btn btn-primary btn-sm" onclick="openInviteMemberModal()">
+                                <i class="fas fa-user-plus"></i> Invite Member
+                            </button>
+                        </div>
+                        <div id="membersList" class="members-list">
+                            <!-- Members will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Invitations Tab -->
+                    <div id="invitationsTab" class="tab-content">
+                        <div class="tab-header">
+                            <h4>Pending Invitations</h4>
+                        </div>
+                        <div id="invitationsList" class="invitations-list">
+                            <!-- Invitations will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Settings Tab -->
+                    <div id="settingsTab" class="tab-content">
+                        <div class="tab-header">
+                            <h4>Group Settings</h4>
+                        </div>
+                        <form id="groupSettingsForm" class="settings-form">
+                            <!-- Settings form will be loaded here -->
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invite Member Modal -->
+        <div id="inviteMemberModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user-plus"></i> Invite Family Member</h3>
+                    <button class="close-btn" onclick="closeInviteMemberModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="inviteMemberForm">
+                    <div class="form-group">
+                        <label for="inviteEmail">Email Address *</label>
+                        <input type="email" id="inviteEmail" name="email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="inviteRole">Role</label>
+                        <select id="inviteRole" name="role">
+                            <option value="member">Member</option>
+                            <option value="viewer">Viewer</option>
+                        </select>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeInviteMemberModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send Invitation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Pending Invitations Modal -->
+        <div id="pendingInvitationsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-envelope"></i> Pending Invitations</h3>
+                    <button class="close-btn" onclick="closePendingInvitationsModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="pendingInvitationsList" class="pending-invitations-list">
+                        <!-- Pending invitations will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="loading-spinner">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-storage-compat.min.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "demo-key",
+            authDomain: "securegov-demo.firebaseapp.com",
+            projectId: "securegov-demo",
+            storageBucket: "securegov-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+    </script>
+    <script src="../js/family.js"></script>
+</body>
+</html>

@@ -1,4 +1,12 @@
 {
+  "name": "securegov-client",
+  "version": "1.0.0",
+  "description": "SecureGov - Government Document Management System",
+  "main": "index.html",
+  "scripts": {
+    "start": "live-server --port=3000",
+    "dev": "live-server --port=3000 --watch=."
+  },
   "dependencies": {
     "gridfs-stream": "^1.1.1",
     "joi": "^18.0.1",
@@ -6,5 +14,18 @@
     "mongoose": "^8.18.1",
     "multer": "^1.4.4",
     "multer-gridfs-storage": "^5.0.2"
-  }
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "keywords": [
+    "government",
+    "documents",
+    "security",
+    "aadhaar",
+    "pan",
+    "firebase"
+  ],
+  "author": "SecureGov Team",
+  "license": "MIT"
 }
