@@ -22,3 +22,5 @@ Thumbs.db
 # Editor directories and files
 .vscode/
 .idea/
+
+server/serviceAccountKey.json
