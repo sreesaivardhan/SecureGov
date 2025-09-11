@@ -25,3 +25,4 @@ Thumbs.db
 
 server/serviceAccountKey.json
 js/firebase-init.js
+js/firebase-config.js
