@@ -194,14 +194,14 @@
                     <div id="uploadSection" class="dashboard-section" style="display: none;">
                         <h2>Upload New Document</h2>
                         <form id="uploadForm">
-                            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                            <div class="upload-area" onclick="triggerFileInput()">
                                 <div class="upload-icon">
                                     <i class="fas fa-cloud-upload-alt"></i>
                                 </div>
                                 <h3>Click to upload or drag and drop</h3>
                                 <p>PDF, JPG, PNG files only (Max 10MB)</p>
-                                <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="handleFileSelect(event)">
                             </div>
+                            <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="handleFileSelect(event)">
                             <div class="form-group">
                                 <label for="docType">Document Type</label>
                                 <select id="docType" autocomplete="off" required>
@@ -339,7 +339,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-storage-compat.min.js"></script>
 
 <script src="config/firebase-config.js"></script>
-<script src="js/app.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
     
 </body>
 </html>

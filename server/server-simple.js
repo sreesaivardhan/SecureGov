@@ -1,8 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
+const { MongoClient, ObjectId } = require('mongodb');
 const admin = require('firebase-admin');
+const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,14 +11,47 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Access-Control-Allow-Private-Network']
+}));
+
+// Add private network access headers for Chrome's new security requirements
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Private-Network', 'true');
+  next();
+});
+
 app.use(express.json());
 
+// Serve static files for testing
+app.get('/', (req, res) => {
+  res.send('SecureGov Backend Server is running!');
+});
+
+// Test endpoint
+app.get('/test', (req, res) => {
+  res.json({ message: 'Server is working!' });
+});
+
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/secureGovDocs';
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+let mongoClient;
+
+async function connectMongoDB() {
+  try {
+    mongoClient = new MongoClient(MONGODB_URI);
+    await mongoClient.connect();
+    console.log('✅ MongoDB connected');
+  } catch (err) {
+    console.error('❌ MongoDB connection error:', err);
+  }
+}
+
+connectMongoDB();
 
 // Firebase Admin initialization
 const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_ADMIN_KEY_PATH || path.join(__dirname, 'serviceAccountKey.json');
@@ -36,16 +70,26 @@ if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
 }
 
 // Basic auth middleware
-const verifyToken = async (req, res, next) => {
+async function verifyToken(req, res, next) {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    console.log('🔐 Auth header:', authHeader);
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No valid auth header');
       return res.status(401).json({ error: 'No token provided' });
     }
+
+    const token = authHeader.split(' ')[1];
+    console.log('🎫 Token received:', token.substring(0, 20) + '...');
+    
     const decodedToken = await admin.auth().verifyIdToken(token);
+    console.log('✅ Token verified for user:', decodedToken.uid);
+    
     req.user = decodedToken;
     next();
   } catch (error) {
+    console.error('❌ Token verification failed:', error.message);
     res.status(401).json({ error: 'Invalid token' });
   }
 };
@@ -58,66 +102,525 @@ app.get('/api/health', (req, res) => {
 // User sync endpoint
 app.post('/api/users/sync', verifyToken, async (req, res) => {
   try {
+    console.log('👤 User sync request:', req.body);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const userData = {
+      firebaseUID: req.user.uid,
+      email: req.user.email || req.body.email,
+      name: req.body.name || req.user.name || req.user.email?.split('@')[0] || 'User',
+      emailVerified: req.user.email_verified || req.body.emailVerified || false,
+      lastLogin: new Date(),
+      profilePicture: req.body.profilePicture || null,
+      phoneNumber: req.body.phoneNumber || null,
+      updatedAt: new Date()
+    };
+    
+    // Upsert user data
+    await db.collection('users').updateOne(
+      { firebaseUID: req.user.uid },
+      { $set: userData },
+      { upsert: true }
+    );
+    
+    await client.close();
+    
+    console.log('✅ User synced successfully:', req.user.uid);
+    
     res.json({
       success: true,
-      user: {
-        uid: req.user.uid,
-        email: req.user.email,
-        emailVerified: req.user.email_verified
-      }
+      message: 'User synced successfully',
+      user: userData
     });
   } catch (error) {
-    res.status(500).json({ error: 'User sync failed' });
+    console.error('❌ User sync error:', error);
+    res.status(500).json({ error: 'Failed to sync user' });
+  }
+});
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'), false);
+    }
   }
 });
 
 // Documents endpoints
 app.get('/api/documents', verifyToken, async (req, res) => {
   try {
-    const { limit = 50, page = 1 } = req.query;
+    console.log('📋 Fetching documents for user:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const documents = await db.collection('documents')
+      .find({ 
+        uploadedBy: req.user.uid,
+        status: 'active'
+      })
+      .sort({ uploadDate: -1 })
+      .toArray();
+    
+    console.log('📄 Found documents:', documents.length);
+    console.log('Documents:', documents.map(d => ({ title: d.title, id: d._id, uploadDate: d.uploadDate })));
+    
+    await client.close();
+    
     res.json({
       success: true,
-      documents: [],
+      documents: documents,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: 0
+        page: 1,
+        limit: 50,
+        total: documents.length
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch documents' });
+    console.error('❌ Fetch documents error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch documents' });
+  }
+});
+
+app.get('/api/documents/:id/download', verifyToken, async (req, res) => {
+  try {
+    console.log('📥 Download request for document:', req.params.id);
+    console.log('👤 User:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const document = await db.collection('documents').findOne({
+      _id: new ObjectId(req.params.id),
+      uploadedBy: req.user.uid
+    });
+    
+    if (!document) {
+      console.log('❌ Document not found');
+      await client.close();
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    console.log('✅ Document found:', document.title);
+    
+    // Convert base64 back to buffer
+    const fileBuffer = Buffer.from(document.fileData, 'base64');
+    
+    res.set({
+      'Content-Type': document.mimeType,
+      'Content-Disposition': `inline; filename="${document.fileName}"`,
+      'Content-Length': fileBuffer.length
+    });
+    
+    res.send(fileBuffer);
+    await client.close();
+  } catch (error) {
+    console.error('❌ Download error:', error);
+    res.status(500).json({ error: 'Download failed' });
+  }
+});
+
+app.delete('/api/documents/:id', verifyToken, async (req, res) => {
+  try {
+    console.log('🗑️ Delete request for document:', req.params.id);
+    console.log('👤 User:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const result = await db.collection('documents').deleteOne({
+      _id: new ObjectId(req.params.id),
+      uploadedBy: req.user.uid
+    });
+    
+    await client.close();
+    
+    if (result.deletedCount === 1) {
+      console.log('✅ Document deleted successfully');
+      res.json({
+        success: true,
+        message: 'Document deleted successfully'
+      });
+    } else {
+      console.log('❌ Document not found or not authorized');
+      res.status(404).json({
+        success: false,
+        message: 'Document not found or not authorized'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Delete error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete document'
+    });
   }
 });
 
 app.get('/api/documents/stats', verifyToken, async (req, res) => {
   try {
+    console.log('📊 Fetching stats for user:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Get total documents count
+    const totalDocuments = await db.collection('documents').countDocuments({
+      uploadedBy: req.user.uid,
+      status: 'active'
+    });
+    
+    // Get recent uploads (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const recentUploads = await db.collection('documents').countDocuments({
+      uploadedBy: req.user.uid,
+      status: 'active',
+      uploadDate: { $gte: sevenDaysAgo }
+    });
+    
+    // Calculate total storage used
+    const documents = await db.collection('documents').find({
+      uploadedBy: req.user.uid,
+      status: 'active'
+    }).toArray();
+    
+    const storageUsed = documents.reduce((total, doc) => total + (doc.fileSize || 0), 0);
+    
+    await client.close();
+    
+    console.log('📊 Stats calculated:', { totalDocuments, recentUploads, storageUsed });
+    
     res.json({
       success: true,
       stats: {
-        totalDocuments: 0,
-        recentUploads: 0,
-        sharedDocuments: 0,
-        storageUsed: 0
+        totalDocuments,
+        recentUploads,
+        sharedDocuments: 0, // TODO: Implement sharing
+        storageUsed,
+        familyMembers: 0 // TODO: Implement family member count
       }
     });
   } catch (error) {
+    console.error('❌ Stats error:', error);
     res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
 
-app.post('/api/documents/upload', verifyToken, (req, res) => {
-  res.status(501).json({ error: 'Upload endpoint not implemented yet' });
+app.post('/api/documents/upload', verifyToken, upload.single('document'), async (req, res) => {
+  try {
+    console.log('📁 Upload request received');
+    console.log('User:', req.user.uid);
+    console.log('Body:', req.body);
+    
+    const { file } = req;
+    
+    if (!file) {
+      console.log('❌ No file in request');
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    console.log('📄 File details:', {
+      name: file.originalname,
+      size: file.size,
+      type: file.mimetype
+    });
+
+    const documentMetadata = {
+      title: req.body.title || file.originalname,
+      description: req.body.description || '',
+      category: req.body.category || 'other',
+      uploadDate: new Date(),
+      lastModified: new Date(),
+      uploadedBy: req.user.uid,
+      fileName: file.originalname,
+      originalName: file.originalname,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      downloadCount: 0,
+      tags: req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [],
+      permissions: {
+        read: [req.user.uid],
+        write: [req.user.uid],
+        admin: [req.user.uid]
+      },
+      status: 'active',
+      verificationStatus: 'pending',
+      // Store file data as base64
+      fileData: file.buffer.toString('base64')
+    };
+
+    console.log('💾 Saving to MongoDB...');
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    const result = await db.collection('documents').insertOne(documentMetadata);
+    await client.close();
+
+    console.log('✅ Document saved with ID:', result.insertedId);
+
+    res.status(201).json({
+      success: true,
+      message: 'Document uploaded successfully',
+      documentId: result.insertedId,
+      category: req.body.category || 'other'
+    });
+
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Upload failed'
+    });
+  }
 });
 
 // Family endpoints
 app.get('/api/family', verifyToken, async (req, res) => {
   try {
+    console.log('👨‍👩‍👧‍👦 Fetching family members for user:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const familyMembers = await db.collection('family_members')
+      .find({ userId: req.user.uid, status: 'active' })
+      .toArray();
+    
+    console.log('👨‍👩‍👧‍👦 Found family members:', familyMembers.length);
+    
+    await client.close();
+    
     res.json({
       success: true,
-      familyGroups: []
+      familyGroups: familyMembers
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch family groups' });
+    console.error('❌ Family fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch family' });
+  }
+});
+
+app.post('/api/family/invite', verifyToken, async (req, res) => {
+  try {
+    console.log('📧 Family invite request:', req.body);
+    
+    const { email, relationship } = req.body;
+    
+    if (!email || !relationship) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email and relationship are required' 
+      });
+    }
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Check if already exists
+    const existing = await db.collection('family_members').findOne({
+      userId: req.user.uid,
+      memberEmail: email,
+      status: { $in: ['active', 'pending'] }
+    });
+    
+    if (existing) {
+      await client.close();
+      return res.status(400).json({
+        success: false,
+        message: 'This user is already invited or is a family member'
+      });
+    }
+    
+    // Add family member invitation
+    const familyMember = {
+      userId: req.user.uid,
+      memberEmail: email,
+      relationship: relationship,
+      invitedAt: new Date(),
+      status: 'pending',
+      invitedBy: req.user.email || req.user.uid,
+      inviteToken: Math.random().toString(36).substring(2, 15)
+    };
+    
+    const result = await db.collection('family_members').insertOne(familyMember);
+    await client.close();
+    
+    console.log('✅ Family member invited:', result.insertedId);
+    
+    res.json({
+      success: true,
+      message: 'Family member invited successfully',
+      memberId: result.insertedId
+    });
+    
+  } catch (error) {
+    console.error('❌ Family invite error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to invite family member' 
+    });
+  }
+});
+
+// Accept family invitation
+app.post('/api/family/accept/:inviteId', verifyToken, async (req, res) => {
+  try {
+    console.log('✅ Family invite acceptance:', req.params.inviteId);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Find the invitation
+    const invitation = await db.collection('family_members').findOne({
+      _id: new ObjectId(req.params.inviteId),
+      memberEmail: req.user.email,
+      status: 'pending'
+    });
+    
+    if (!invitation) {
+      await client.close();
+      return res.status(404).json({
+        success: false,
+        message: 'Invitation not found or already processed'
+      });
+    }
+    
+    // Update invitation status to active
+    await db.collection('family_members').updateOne(
+      { _id: new ObjectId(req.params.inviteId) },
+      { 
+        $set: { 
+          status: 'active',
+          acceptedAt: new Date(),
+          memberUID: req.user.uid
+        }
+      }
+    );
+    
+    await client.close();
+    
+    console.log('✅ Family invitation accepted');
+    
+    res.json({
+      success: true,
+      message: 'Family invitation accepted successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Family accept error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to accept invitation'
+    });
+  }
+});
+
+// Decline family invitation
+app.post('/api/family/decline/:inviteId', verifyToken, async (req, res) => {
+  try {
+    console.log('❌ Family invite declined:', req.params.inviteId);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Find the invitation
+    const invitation = await db.collection('family_members').findOne({
+      _id: new ObjectId(req.params.inviteId),
+      memberEmail: req.user.email,
+      status: 'pending'
+    });
+    
+    if (!invitation) {
+      await client.close();
+      return res.status(404).json({
+        success: false,
+        message: 'Invitation not found or already processed'
+      });
+    }
+    
+    // Update invitation status to declined
+    await db.collection('family_members').updateOne(
+      { _id: new ObjectId(req.params.inviteId) },
+      { 
+        $set: { 
+          status: 'declined',
+          declinedAt: new Date(),
+          memberUID: req.user.uid
+        }
+      }
+    );
+    
+    await client.close();
+    
+    console.log('❌ Family invitation declined');
+    
+    res.json({
+      success: true,
+      message: 'Family invitation declined successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Family decline error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to decline invitation'
+    });
+  }
+});
+
+// Get pending invitations for current user
+app.get('/api/family/invitations', verifyToken, async (req, res) => {
+  try {
+    console.log('📨 Getting invitations for:', req.user.email);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const invitations = await db.collection('family_members')
+      .find({ 
+        memberEmail: req.user.email,
+        status: 'pending'
+      })
+      .toArray();
+    
+    await client.close();
+    
+    res.json({
+      success: true,
+      invitations: invitations
+    });
+    
+  } catch (error) {
+    console.error('❌ Get invitations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get invitations'
+    });
   }
 });
 
@@ -141,6 +644,74 @@ app.get('/api/profile', verifyToken, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Family invite endpoint
+app.post('/api/family/invite', verifyToken, async (req, res) => {
+  try {
+    console.log('👨‍👩‍👧‍👦 Family invite request:', req.body);
+    console.log('User:', req.user.uid);
+    
+    const { memberEmail, memberName, relationship, message } = req.body;
+    
+    if (!memberEmail || !memberName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and name are required'
+      });
+    }
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Check if invitation already exists
+    const existingInvite = await db.collection('family_members').findOne({
+      inviterUID: req.user.uid,
+      memberEmail: memberEmail,
+      status: 'pending'
+    });
+    
+    if (existingInvite) {
+      await client.close();
+      return res.status(400).json({
+        success: false,
+        message: 'Invitation already sent to this email'
+      });
+    }
+    
+    // Create family invitation
+    const invitation = {
+      inviterUID: req.user.uid,
+      inviterEmail: req.user.email,
+      inviterName: req.user.name || req.user.email,
+      memberEmail: memberEmail,
+      memberName: memberName,
+      relationship: relationship || 'family',
+      message: message || '',
+      status: 'pending',
+      inviteDate: new Date(),
+      expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    };
+    
+    const result = await db.collection('family_members').insertOne(invitation);
+    await client.close();
+    
+    console.log('✅ Family invitation created:', result.insertedId);
+    
+    res.json({
+      success: true,
+      message: 'Family invitation sent successfully',
+      invitationId: result.insertedId
+    });
+    
+  } catch (error) {
+    console.error('❌ Family invite error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send family invitation'
+    });
   }
 });
 

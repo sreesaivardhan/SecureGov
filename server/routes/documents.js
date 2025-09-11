@@ -229,20 +229,25 @@ router.get('/', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
 });
 
 // Get document statistics
-router.get('/stats', authenticateUser, async (req, res) => {
+router.get('/stats', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
   try {
-    const db = await getDB();
+    const { MongoClient } = require('mongodb');
+    const client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');
+    await client.connect();
+    const db = client.db('secureGovDocs');
     
-    const totalDocs = await collections.documents().countDocuments({
+    const totalDocs = await db.collection('documents').countDocuments({
       uploadedBy: req.user.uid,
       status: 'active'
     });
 
-    const sharedDocs = await collections.documents().countDocuments({
+    const sharedDocs = await db.collection('documents').countDocuments({
       uploadedBy: req.user.uid,
       status: 'active',
       'permissions.read': { $exists: true, $not: { $size: 1 } }
     });
+
+    await client.close();
 
     res.json({
       success: true,
@@ -260,16 +265,33 @@ router.get('/stats', authenticateUser, async (req, res) => {
 });
 
 // Download document
-router.get('/:id/download', authenticateUser, checkDocumentPermission('read'), async (req, res) => {
+router.get('/:id/download', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
   try {
-    const document = req.document;
-    const gridfsBucket = getGridFSBucket();
+    const { MongoClient } = require('mongodb');
+    const client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');
+    await client.connect();
+    const db = client.db('secureGovDocs');
+
+    const document = await db.collection('documents').findOne({
+      _id: new ObjectId(req.params.id),
+      $or: [
+        { uploadedBy: req.user.uid },
+        { 'permissions.read': req.user.uid }
+      ]
+    });
+
+    if (!document) {
+      await client.close();
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
 
     // Update download count
-    await collections.documents().updateOne(
+    await db.collection('documents').updateOne(
       { _id: new ObjectId(req.params.id) },
       { $inc: { downloadCount: 1 } }
     );
+
+    await client.close();
 
     // Set headers for file download
     res.set({
@@ -277,17 +299,9 @@ router.get('/:id/download', authenticateUser, checkDocumentPermission('read'), a
       'Content-Disposition': `attachment; filename="${document.originalName}"`
     });
 
-    // Stream file from GridFS
-    const downloadStream = gridfsBucket.openDownloadStream(new ObjectId(document.fileId));
-    
-    downloadStream.on('error', (error) => {
-      console.error('Download stream error:', error);
-      if (!res.headersSent) {
-        res.status(404).json({ success: false, message: 'File not found' });
-      }
-    });
-
-    downloadStream.pipe(res);
+    // Send file data from base64
+    const fileBuffer = Buffer.from(document.fileData, 'base64');
+    res.send(fileBuffer);
 
   } catch (error) {
     console.error('Download error:', error);
@@ -299,7 +313,7 @@ router.get('/:id/download', authenticateUser, checkDocumentPermission('read'), a
 });
 
 // Share document with individual user or family group
-router.post('/:id/share', authenticateUser, checkDocumentPermission('admin'), async (req, res) => {
+router.post('/:id/share', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
   try {
     const { email, permission, familyGroupId, shareType } = req.body;
     

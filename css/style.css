@@ -400,3 +400,173 @@ body {
 .hidden {
     display: none;
 }
+
+/* Document Modal Styles */
+.document-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.document-modal.active {
+    display: flex;
+}
+
+.document-modal .modal-content {
+    background: white;
+    border-radius: 8px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.document-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+}
+
+.document-modal .modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.document-modal .modal-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.document-modal .btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.document-modal .btn-danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.document-modal .btn-close {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.document-modal .btn-secondary:hover,
+.document-modal .btn-danger:hover,
+.document-modal .btn-close:hover {
+    opacity: 0.9;
+}
+
+.document-modal .pdf-container {
+    padding: 0;
+}
+
+.document-modal .image-container {
+    padding: 20px;
+    text-align: center;
+    background: #f8f9fa;
+}
+
+.document-modal .pdf-viewer {
+    width: 80vw;
+    height: 80vh;
+}
+
+.document-modal .image-viewer {
+    max-width: 80vw;
+    max-height: 80vh;
+}
+
+/* Button styles for family invitations */
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-small:hover {
+    opacity: 0.9;
+}
+
+/* Alert styles */
+.alert {
+    padding: 15px;
+    border-radius: 5px;
+    margin: 10px 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert.show {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
