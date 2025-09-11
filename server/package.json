@@ -6,12 +6,16 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server-clean.js",
-    "dev": "nodemon server-clean.js"
+    "dev": "nodemon server-clean.js",
+    "build": "npm install --legacy-peer-deps"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -20,8 +24,9 @@
     "firebase-admin": "^13.5.0",
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.19.0",
     "mongoose": "^8.18.1",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^1.4.4",
     "multer-gridfs-storage": "^5.0.2",
     "nodemailer": "^6.9.7",
     "nodemon": "^3.1.10",
