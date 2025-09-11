@@ -11,6 +11,7 @@
 directory_structure.txt
 file_list.txt
 project-structure.txt
+DEPLOYMENT.md
 
 # Firebase
 /config/firebase-config.js
