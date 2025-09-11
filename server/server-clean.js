@@ -43,19 +43,32 @@ async function connectMongoDB() {
 connectMongoDB();
 
 // Firebase Admin initialization
-const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_ADMIN_KEY_PATH || path.join(__dirname, 'serviceAccountKey.json');
-if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-  try {
-    const serviceAccount = require(SERVICE_ACCOUNT_PATH);
+try {
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+    // Production: Use environment variables
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      })
     });
-    console.log('✅ Firebase Admin initialized');
-  } catch (err) {
-    console.error('❌ Firebase Admin initialization error:', err);
+    console.log('✅ Firebase Admin initialized from environment variables');
+  } else {
+    // Development: Use service account file
+    const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_ADMIN_KEY_PATH || path.join(__dirname, 'serviceAccountKey.json');
+    if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+      const serviceAccount = require(SERVICE_ACCOUNT_PATH);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+      console.log('✅ Firebase Admin initialized from service account file');
+    } else {
+      console.warn('⚠️ Firebase service account key not found. Some features may not work.');
+    }
   }
-} else {
-  console.warn('⚠️ Firebase service account key not found at:', SERVICE_ACCOUNT_PATH);
+} catch (err) {
+  console.error('❌ Firebase Admin initialization error:', err);
 }
 
 // Authentication middleware
@@ -983,7 +996,7 @@ app.put('/api/users/profile', verifyToken, async (req, res) => {
 app.use(errorHandler.middleware());
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use((req, res) => {
   const error = errorHandler.createError('DB_RECORD_NOT_FOUND', {
     url: req.originalUrl,
     method: req.method
