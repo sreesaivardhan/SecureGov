@@ -1,0 +1,51 @@
+[build]
+  # Build command (not needed for static site)
+  command = "echo 'Static site - no build required'"
+  # Publish directory
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Redirect rules for SPA behavior
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend-server.herokuapp.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseapp.com https://your-backend-server.herokuapp.com; img-src 'self' data: https:;"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment variables (set these in Netlify dashboard)
+# FIREBASE_API_KEY
+# FIREBASE_AUTH_DOMAIN
+# FIREBASE_PROJECT_ID
+# BACKEND_URL

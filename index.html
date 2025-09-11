@@ -200,6 +200,32 @@
                                 <i class="fas fa-plus"></i> Add Document
                             </button>
                         </div>
+                        
+                        <!-- Search and Filter Bar -->
+                        <div class="search-filter-bar">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="documentSearch" placeholder="Search documents..." onkeyup="searchDocuments()">
+                            </div>
+                            <div class="filter-options">
+                                <select id="categoryFilter" onchange="filterDocuments()">
+                                    <option value="">All Categories</option>
+                                    <option value="government">Government</option>
+                                    <option value="personal">Personal</option>
+                                    <option value="financial">Financial</option>
+                                    <option value="medical">Medical</option>
+                                    <option value="legal">Legal</option>
+                                </select>
+                                <select id="dateFilter" onchange="filterDocuments()">
+                                    <option value="">All Dates</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                    <option value="year">This Year</option>
+                                </select>
+                            </div>
+                        </div>
+                        
                         <div id="documentsGrid" class="document-grid">
                             <!-- Documents will be populated here -->
                         </div>
@@ -300,6 +326,9 @@
         </div>
     </div>
 
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
     <!-- Modals -->
     <!-- Document Viewer Modal -->
     <div id="documentViewerModal" class="modal">
@@ -368,8 +397,13 @@
 <script src="js/firebase-config.js"></script>
 
     <script src="js/config.js"></script>
+    <script src="js/errorHandler.js"></script>
+    <script src="js/performance.js"></script>
     <script src="js/app.js"></script>
-    
+    <script src="js/advanced-features.js"></script>
+</body>
+</html>
+
     <script>
             // Load dashboard data including family information
             async function loadDashboardData() {

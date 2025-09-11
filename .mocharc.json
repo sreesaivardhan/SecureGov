@@ -1,0 +1,11 @@
+{
+  "require": ["tests/test-config.js"],
+  "timeout": 10000,
+  "recursive": true,
+  "reporter": "spec",
+  "exit": true,
+  "colors": true,
+  "bail": false,
+  "grep": "",
+  "slow": 2000
+}

@@ -1,11 +1,12 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ObjectId } = require('mongodb');
-const admin = require('firebase-admin');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { MongoClient, ObjectId } = require('mongodb');
+const admin = require('firebase-admin');
+const logger = require('./utils/logger');
+const errorHandler = require('./utils/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -13,6 +14,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(logger.requestLogger());
 
 // Serve static files for testing
 app.get('/', (req, res) => {
@@ -61,16 +63,34 @@ async function verifyToken(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
+      throw errorHandler.createError('AUTH_TOKEN_MISSING', {
+        url: req.url,
+        method: req.method
+      });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.substring(7);
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken;
+    
+    logger.debug('Token verified successfully', {
+      userId: decodedToken.uid,
+      email: decodedToken.email
+    });
+    
     next();
   } catch (error) {
-    console.error('❌ Token verification error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+    if (error.code && error.statusCode) {
+      // Already a handled error
+      errorHandler.handleError(error, req, res);
+    } else {
+      // Firebase auth error
+      const handledError = errorHandler.createError('AUTH_TOKEN_INVALID', {
+        url: req.url,
+        method: req.method
+      }, error);
+      errorHandler.handleError(handledError, req, res);
+    }
   }
 }
 
@@ -745,6 +765,127 @@ app.post('/api/family/reject-invitation/:token', verifyToken, async (req, res) =
   }
 });
 
+// Document encryption endpoint
+app.patch('/api/documents/:id/encryption', verifyToken, async (req, res) => {
+  try {
+    console.log('🔐 Toggle encryption for document:', req.params.id);
+    
+    const { encrypted, encryptionKey } = req.body;
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const result = await db.collection('documents').updateOne(
+      { _id: new ObjectId(req.params.id), userId: req.user.uid },
+      { 
+        $set: { 
+          encrypted: encrypted,
+          encryptionKey: encrypted ? encryptionKey : null,
+          encryptionTimestamp: new Date()
+        }
+      }
+    );
+    
+    await client.close();
+    
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: `Document ${encrypted ? 'encrypted' : 'decrypted'} successfully`
+    });
+    
+  } catch (error) {
+    console.error('❌ Encryption toggle error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update encryption status'
+    });
+  }
+});
+
+// Document search endpoint
+app.get('/api/documents/search', verifyToken, async (req, res) => {
+  try {
+    console.log('🔍 Search documents for user:', req.user.uid);
+    
+    const { q, category, dateFilter } = req.query;
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    let query = { userId: req.user.uid };
+    
+    // Add text search if query provided
+    if (q) {
+      query.$or = [
+        { filename: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { tags: { $in: [new RegExp(q, 'i')] } }
+      ];
+    }
+    
+    // Add category filter
+    if (category) {
+      query.category = category;
+    }
+    
+    // Add date filter
+    if (dateFilter) {
+      const now = new Date();
+      let dateQuery;
+      
+      switch (dateFilter) {
+        case 'today':
+          const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+          dateQuery = { $gte: startOfDay, $lt: endOfDay };
+          break;
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          dateQuery = { $gte: weekAgo };
+          break;
+        case 'month':
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          dateQuery = { $gte: startOfMonth };
+          break;
+        case 'year':
+          const startOfYear = new Date(now.getFullYear(), 0, 1);
+          dateQuery = { $gte: startOfYear };
+          break;
+      }
+      
+      if (dateQuery) {
+        query.uploadedAt = dateQuery;
+      }
+    }
+    
+    const documents = await db.collection('documents')
+      .find(query)
+      .sort({ uploadedAt: -1 })
+      .toArray();
+    
+    await client.close();
+    
+    res.json({
+      success: true,
+      documents: documents
+    });
+    
+  } catch (error) {
+    console.error('❌ Search error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Search failed'
+    });
+  }
+});
+
 // Profile endpoints
 app.get('/api/users/profile', verifyToken, async (req, res) => {
   try {
@@ -838,9 +979,25 @@ app.put('/api/users/profile', verifyToken, async (req, res) => {
   }
 });
 
-// Start server
+// Error handling middleware (must be last)
+app.use(errorHandler.middleware());
+
+// 404 handler
+app.use('*', (req, res) => {
+  const error = errorHandler.createError('DB_RECORD_NOT_FOUND', {
+    url: req.originalUrl,
+    method: req.method
+  });
+  errorHandler.handleError(error, req, res);
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 SecureGov server running on port ${PORT}`);
+  logger.info(`Server started successfully`, {
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
+  console.log(`🚀 Server running on port ${PORT}`);
 });
 
 module.exports = app;

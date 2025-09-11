@@ -6,7 +6,11 @@
   "main": "index.html",
   "scripts": {
     "start": "live-server --port=3000",
-    "dev": "live-server --port=3000 --watch=."
+    "dev": "live-server --port=3000 --watch=.",
+    "test": "mocha tests/unit/**/*.test.js --timeout 10000",
+    "test:watch": "mocha tests/unit/**/*.test.js --watch",
+    "test:coverage": "nyc mocha tests/unit/**/*.test.js",
+    "test:integration": "mocha tests/integration/**/*.test.js --timeout 30000"
   },
   "dependencies": {
     "gridfs-stream": "^1.1.1",
@@ -17,7 +21,13 @@
     "multer-gridfs-storage": "^5.0.2"
   },
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "live-server": "^1.2.2",
+    "mocha": "^10.2.0",
+    "chai": "^4.3.7",
+    "sinon": "^15.2.0",
+    "supertest": "^6.3.3",
+    "nyc": "^15.1.0",
+    "puppeteer": "^21.0.0"
   },
   "keywords": [
     "government",
