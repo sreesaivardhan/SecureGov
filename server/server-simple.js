@@ -11,20 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Access-Control-Allow-Private-Network']
-}));
-
-// Add private network access headers for Chrome's new security requirements
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Private-Network', 'true');
-  next();
-});
-
+app.use(cors());
 app.use(express.json());
 
 // Serve static files for testing
@@ -644,74 +631,6 @@ app.get('/api/profile', verifyToken, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch profile' });
-  }
-});
-
-// Family invite endpoint
-app.post('/api/family/invite', verifyToken, async (req, res) => {
-  try {
-    console.log('👨‍👩‍👧‍👦 Family invite request:', req.body);
-    console.log('User:', req.user.uid);
-    
-    const { memberEmail, memberName, relationship, message } = req.body;
-    
-    if (!memberEmail || !memberName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and name are required'
-      });
-    }
-    
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db('secureGovDocs');
-    
-    // Check if invitation already exists
-    const existingInvite = await db.collection('family_members').findOne({
-      inviterUID: req.user.uid,
-      memberEmail: memberEmail,
-      status: 'pending'
-    });
-    
-    if (existingInvite) {
-      await client.close();
-      return res.status(400).json({
-        success: false,
-        message: 'Invitation already sent to this email'
-      });
-    }
-    
-    // Create family invitation
-    const invitation = {
-      inviterUID: req.user.uid,
-      inviterEmail: req.user.email,
-      inviterName: req.user.name || req.user.email,
-      memberEmail: memberEmail,
-      memberName: memberName,
-      relationship: relationship || 'family',
-      message: message || '',
-      status: 'pending',
-      inviteDate: new Date(),
-      expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    };
-    
-    const result = await db.collection('family_members').insertOne(invitation);
-    await client.close();
-    
-    console.log('✅ Family invitation created:', result.insertedId);
-    
-    res.json({
-      success: true,
-      message: 'Family invitation sent successfully',
-      invitationId: result.insertedId
-    });
-    
-  } catch (error) {
-    console.error('❌ Family invite error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send family invitation'
-    });
   }
 });
 
