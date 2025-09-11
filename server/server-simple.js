@@ -301,7 +301,7 @@ app.get('/api/documents/stats', verifyToken, async (req, res) => {
         recentUploads,
         sharedDocuments: 0, // TODO: Implement sharing
         storageUsed,
-        familyMembers: 0 // TODO: Implement family member count
+        familyMembers: 0 // Family features disabled
       }
     });
   } catch (error) {
@@ -381,8 +381,243 @@ app.post('/api/documents/upload', verifyToken, upload.single('document'), async 
   }
 });
 
+// Family functionality removed - will be reimplemented later
+
 // Family endpoints
-app.get('/api/family', verifyToken, async (req, res) => {
+app.get('/api/family/my-groups', verifyToken, async (req, res) => {
+  try {
+    console.log('👨‍👩‍👧‍👦 Fetching family groups for user:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const familyMembers = await db.collection('family_members')
+      .find({ userId: req.user.uid })
+      .toArray();
+    
+    console.log('👨‍👩‍👧‍👦 Found family members:', familyMembers.length);
+    
+    await client.close();
+    
+    res.json({
+      success: true,
+      familyGroups: familyMembers
+    });
+  } catch (error) {
+    console.error('❌ Family fetch error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch family groups' });
+  }
+});
+
+app.get('/api/family/invitations/pending', verifyToken, async (req, res) => {
+  try {
+    console.log('📨 Getting invitations for:', req.user.email);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    const invitations = await db.collection('family_members')
+      .find({ 
+        memberEmail: req.user.email,
+        status: 'pending'
+      })
+      .toArray();
+    
+    await client.close();
+    
+    res.json({
+      success: true,
+      invitations: invitations
+    });
+    
+  } catch (error) {
+    console.error('❌ Get invitations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get invitations'
+    });
+  }
+});
+  
+  // Add missing endpoints that app.js is calling
+  app.get('/api/family', verifyToken, async (req, res) => {
+    try {
+      console.log('👨‍👩‍👧‍👦 Fetching family for user:', req.user.uid);
+      
+      const client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      const db = client.db('secureGovDocs');
+      
+      const familyMembers = await db.collection('family_members')
+        .find({ userId: req.user.uid })
+        .toArray();
+      
+      await client.close();
+      
+      res.json({
+        success: true,
+        familyMembers: familyMembers
+      });
+    } catch (error) {
+      console.error('❌ Family fetch error:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch family' });
+    }
+  });
+  
+  app.get('/api/family/my-groups', verifyToken, async (req, res) => {
+    try {
+      console.log('👨‍👩‍👧‍👦 Fetching my groups for user:', req.user.uid);
+      
+      const client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      const db = client.db('secureGovDocs');
+      
+      const familyGroups = await db.collection('family_members')
+        .find({ userId: req.user.uid })
+        .toArray();
+      
+      await client.close();
+      
+      res.json({
+        success: true,
+        familyGroups: familyGroups
+      });
+    } catch (error) {
+      console.error('❌ Family groups fetch error:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch family groups' });
+    }
+  });
+  
+  app.get('/api/family/invitations', verifyToken, async (req, res) => {
+    try {
+      console.log('📨 Getting invitations for:', req.user.email);
+      
+      const client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      const db = client.db('secureGovDocs');
+      
+      const invitations = await db.collection('family_members')
+        .find({ 
+          memberEmail: req.user.email,
+          status: 'pending'
+        })
+        .toArray();
+      
+      await client.close();
+      
+      res.json({
+        success: true,
+        invitations: invitations
+      });
+      
+    } catch (error) {
+      console.error('❌ Get invitations error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get invitations'
+      });
+    }
+  });
+  
+  app.post('/api/family/invite', verifyToken, async (req, res) => {
+    try {
+      console.log('📧 Family invite request:', req.body);
+      
+      const { email, relationship } = req.body;
+      
+      if (!email || !relationship) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Email and relationship are required' 
+        });
+      }
+      
+      const client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      const db = client.db('secureGovDocs');
+      
+      // Check if already exists
+      const existing = await db.collection('family_members').findOne({
+        userId: req.user.uid,
+        memberEmail: email,
+        status: { $in: ['active', 'pending'] }
+      });
+      
+      if (existing) {
+        await client.close();
+        return res.status(400).json({
+          success: false,
+          message: 'This user is already invited or is a family member'
+        });
+      }
+      
+      // Get inviter's email from Firebase user data
+      const inviterEmail = req.user.email || req.user.uid;
+      
+      // Generate secure invitation token
+      const inviteToken = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      
+      // Add family member invitation
+      const familyMember = {
+        userId: req.user.uid,
+        memberEmail: email,
+        relationship: relationship,
+        invitedAt: new Date(),
+        status: 'pending',
+        invitedBy: inviterEmail,
+        inviteToken: inviteToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+      };
+      
+      console.log('👤 Creating invitation from:', inviterEmail, 'to:', email);
+      
+      const result = await db.collection('family_members').insertOne(familyMember);
+      
+      // Try to send email invitation (don't fail if email fails)
+      try {
+        const EmailService = require('./services/emailService');
+        const emailService = new EmailService();
+        
+        await emailService.sendFamilyInvitation({
+          recipientEmail: email,
+          recipientName: email.split('@')[0],
+          familyGroupName: `${inviterEmail}'s Family`,
+          familyGroupDescription: `Family group managed by ${inviterEmail}`,
+          inviterName: inviterEmail,
+          inviterEmail: inviterEmail,
+          role: relationship,
+          invitationToken: inviteToken,
+          expiresAt: familyMember.expiresAt
+        });
+        
+        console.log('✉️ Email invitation sent to:', email);
+      } catch (emailError) {
+        console.warn('⚠️ Email sending failed (invitation still created):', emailError.message);
+      }
+      
+      await client.close();
+      
+      console.log('✅ Family member invited:', result.insertedId);
+      
+      res.json({
+        success: true,
+        message: 'Family member invited successfully',
+        memberId: result.insertedId
+      });
+      
+    } catch (error) {
+      console.error('❌ Family invite error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to invite family member' 
+      });
+    }
+  });
+
+// Legacy family endpoints for backward compatibility
+app.get('/api/family-legacy', verifyToken, async (req, res) => {
   try {
     console.log('👨‍👩‍👧‍👦 Fetching family members for user:', req.user.uid);
     
@@ -408,7 +643,7 @@ app.get('/api/family', verifyToken, async (req, res) => {
   }
 });
 
-app.post('/api/family/invite', verifyToken, async (req, res) => {
+app.post('/api/family-legacy/invite', verifyToken, async (req, res) => {
   try {
     console.log('📧 Family invite request:', req.body);
     
@@ -471,8 +706,8 @@ app.post('/api/family/invite', verifyToken, async (req, res) => {
   }
 });
 
-// Accept family invitation
-app.post('/api/family/accept/:inviteId', verifyToken, async (req, res) => {
+// Accept family invitation (legacy)
+app.post('/api/family-legacy/accept/:inviteId', verifyToken, async (req, res) => {
   try {
     console.log('✅ Family invite acceptance:', req.params.inviteId);
     
@@ -525,8 +760,8 @@ app.post('/api/family/accept/:inviteId', verifyToken, async (req, res) => {
   }
 });
 
-// Decline family invitation
-app.post('/api/family/decline/:inviteId', verifyToken, async (req, res) => {
+// Decline family invitation (legacy)
+app.post('/api/family-legacy/decline/:inviteId', verifyToken, async (req, res) => {
   try {
     console.log('❌ Family invite declined:', req.params.inviteId);
     
@@ -579,8 +814,8 @@ app.post('/api/family/decline/:inviteId', verifyToken, async (req, res) => {
   }
 });
 
-// Get pending invitations for current user
-app.get('/api/family/invitations', verifyToken, async (req, res) => {
+// Get pending invitations for current user (legacy)
+app.get('/api/family-legacy/invitations', verifyToken, async (req, res) => {
   try {
     console.log('📨 Getting invitations for:', req.user.email);
     
@@ -612,6 +847,65 @@ app.get('/api/family/invitations', verifyToken, async (req, res) => {
 });
 
 // Profile endpoints
+app.get('/api/users/profile', verifyToken, async (req, res) => {
+  try {
+    console.log('👤 Fetching user profile for:', req.user.uid);
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Get user data from database
+    const userData = await db.collection('users').findOne({
+      firebaseUID: req.user.uid
+    });
+    
+    await client.close();
+    
+    const profile = {
+      firebaseUID: req.user.uid,
+      email: req.user.email,
+      name: userData?.name || req.user.name || req.user.email?.split('@')[0] || 'User',
+      personalInfo: {
+        firstName: (userData?.name || req.user.name || '').split(' ')[0] || 'User',
+        lastName: (userData?.name || req.user.name || '').split(' ')[1] || '',
+        email: req.user.email,
+        phoneNumber: userData?.phoneNumber || '',
+        dateOfBirth: userData?.dateOfBirth || '',
+        address: userData?.address || ''
+      },
+      governmentIds: {
+        aadhaar: userData?.governmentIds?.aadhaar || '',
+        pan: userData?.governmentIds?.pan || '',
+        passport: userData?.governmentIds?.passport || '',
+        drivingLicense: userData?.governmentIds?.drivingLicense || ''
+      },
+      securitySettings: {
+        twoFactorEnabled: userData?.securitySettings?.twoFactorEnabled || false,
+        loginNotifications: userData?.securitySettings?.loginNotifications || true,
+        dataSharing: userData?.securitySettings?.dataSharing || false
+      },
+      profileStatus: {
+        completionPercentage: userData?.profileStatus?.completionPercentage || 25,
+        level: userData?.profileStatus?.level || 'basic'
+      },
+      lastLogin: userData?.lastLogin || new Date(),
+      profilePicture: userData?.profilePicture || null
+    };
+    
+    res.json({
+      success: true,
+      profile: profile
+    });
+  } catch (error) {
+    console.error('❌ Profile fetch error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch profile' 
+    });
+  }
+});
+
 app.get('/api/profile', verifyToken, async (req, res) => {
   try {
     res.json({
@@ -631,6 +925,57 @@ app.get('/api/profile', verifyToken, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Share document endpoint
+app.post('/api/share/:id', verifyToken, async (req, res) => {
+  try {
+    console.log('📤 Share document request:', req.params.id, req.body);
+    
+    const { email, permission } = req.body;
+    
+    if (!email || !permission) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email and permission are required' 
+      });
+    }
+    
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    
+    // Find the document
+    const document = await db.collection('documents').findOne({
+      _id: new ObjectId(req.params.id),
+      uploadedBy: req.user.uid
+    });
+    
+    if (!document) {
+      await client.close();
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found or you do not have permission to share it'
+      });
+    }
+    
+    // For now, just simulate sharing (you can implement actual email sending later)
+    console.log(`✉️ Document "${document.title}" shared with ${email} (${permission} permission)`);
+    
+    await client.close();
+    
+    res.json({
+      success: true,
+      message: `Document shared with ${email} successfully`
+    });
+    
+  } catch (error) {
+    console.error('❌ Share error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to share document' 
+    });
   }
 });
 

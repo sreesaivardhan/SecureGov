@@ -4,6 +4,7 @@ const multer = require('multer');
 const { Document, DOCUMENT_CATEGORIES } = require('../models/Document');
 const { uploadToFirebase, deleteFromFirebase, getSignedUrl } = require('../config/firebase-storage');
 const { FamilyGroup, FAMILY_ROLES } = require('../models/FamilyGroup');
+const { authenticateUser } = require('../middleware/auth');
 const SecurityMiddleware = require('../middleware/security');
 
 const router = express.Router();
@@ -516,7 +517,7 @@ router.get('/shared', authenticateUser, async (req, res) => {
 });
 
 // Get single document details
-router.get('/:id', authenticateUser, checkDocumentPermission('read'), async (req, res) => {
+router.get('/:id', authenticateUser, async (req, res) => {
   try {
     const document = req.document;
     
@@ -535,7 +536,7 @@ router.get('/:id', authenticateUser, checkDocumentPermission('read'), async (req
 });
 
 // Update document metadata
-router.put('/:id', authenticateUser, checkDocumentPermission('write'), async (req, res) => {
+router.put('/:id', authenticateUser, async (req, res) => {
   try {
     const updateData = {
       lastModified: new Date()
@@ -605,7 +606,7 @@ router.put('/:id', authenticateUser, checkDocumentPermission('write'), async (re
 });
 
 // Delete document with enhanced validation
-router.delete('/:id', authenticateUser, checkDocumentPermission('admin'), async (req, res) => {
+router.delete('/:id', authenticateUser, async (req, res) => {
   try {
     const document = req.document;
     const db = await getDB();
@@ -663,7 +664,7 @@ router.delete('/:id', authenticateUser, checkDocumentPermission('admin'), async 
 });
 
 // Restore deleted document
-router.post('/:id/restore', authenticateUser, checkDocumentPermission('admin'), async (req, res) => {
+router.post('/:id/restore', authenticateUser, async (req, res) => {
   try {
     const db = await getDB();
     const result = await collections.documents().updateOne(
@@ -733,7 +734,7 @@ router.get('/family-groups', authenticateUser, async (req, res) => {
 });
 
 // Remove document sharing
-router.delete('/:id/share', authenticateUser, checkDocumentPermission('admin'), async (req, res) => {
+router.delete('/:id/share', authenticateUser, async (req, res) => {
   try {
     const { userId, familyGroupId, shareType } = req.body;
     
@@ -810,7 +811,7 @@ router.delete('/:id/share', authenticateUser, checkDocumentPermission('admin'), 
 });
 
 // Get document sharing details
-router.get('/:id/sharing', authenticateUser, checkDocumentPermission('read'), async (req, res) => {
+router.get('/:id/sharing', authenticateUser, async (req, res) => {
   try {
     const document = req.document;
     

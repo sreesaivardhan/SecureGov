@@ -425,7 +425,7 @@ class FamilyManager {
             const formData = new FormData(document.getElementById('inviteMemberForm'));
             const inviteData = {
                 email: formData.get('email'),
-                role: formData.get('role')
+                role: formData.get('role') // Backend expects 'role' field
             };
 
             const response = await this.apiCall(`/family/${this.currentGroupId}/invite`, {

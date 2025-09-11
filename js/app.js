@@ -8,8 +8,32 @@ const API_BASE_URL = 'http://localhost:5000/api';
 
 // Global Variables
 let currentUser = null;
-let selectedFile = null;
 let currentDocumentId = null;
+let currentViewingDocument = null;
+
+// File upload functions
+function triggerFileInput() {
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.click();
+    }
+}
+
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const uploadArea = document.querySelector('.upload-area');
+        if (uploadArea) {
+            uploadArea.innerHTML = `
+                <div class="upload-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <h3>File Selected: ${file.name}</h3>
+                <p>Size: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            `;
+        }
+    }
+}
 
 // Logging System
 const logger = {
@@ -24,45 +48,7 @@ const logger = {
     }
 }
 
-// API Helper Functions
-async function apiCall(endpoint, options = {}) {
-    try {
-        const token = currentUser ? await currentUser.getIdToken() : null;
-        
-        const defaultOptions = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token && { 'Authorization': `Bearer ${token}` })
-            }
-        };
-
-        // Don't set Content-Type for FormData
-        if (options.body instanceof FormData) {
-            delete defaultOptions.headers['Content-Type'];
-        }
-
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            ...defaultOptions,
-            ...options,
-            headers: {
-                ...defaultOptions.headers,
-                ...options.headers
-            }
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP ${response.status}`);
-        }
-
-        return await response.json();
-    } catch (error) {
-        logger.error('API call failed', { endpoint, error: error.message });
-        throw error;
-    }
-}
-
-// Authentication State Observer
+// Authentication State Listener
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         currentUser = user;
@@ -96,8 +82,7 @@ async function createOrUpdateUser(firebaseUser) {
             name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
             emailVerified: firebaseUser.emailVerified,
             lastLogin: new Date().toISOString(),
-            profilePicture: firebaseUser.photoURL || null,
-            phoneNumber: firebaseUser.phoneNumber || null
+            profilePicture: firebaseUser.photoURL || null
         };
 
         const token = await firebaseUser.getIdToken();
@@ -111,18 +96,94 @@ async function createOrUpdateUser(firebaseUser) {
         });
 
         if (response.ok) {
-            const result = await response.json();
-            logger.info('User synced with backend', { uid: firebaseUser.uid });
+            const data = await response.json();
+            logger.info('User synced successfully', data);
+        } else {
+            logger.warn('User sync failed', { status: response.status });
         }
     } catch (error) {
-        logger.error('User sync failed', error);
-        // Don't block authentication if backend sync fails
+        logger.error('Error syncing user', error);
     }
 }
 
-// Navigation Functions
+// Screen Management
+function showScreen(screenId) {
+    const screens = ['loginScreen', 'registerScreen', 'dashboardScreen'];
+    screens.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.style.display = id === screenId ? 'block' : 'none';
+            if (id === screenId) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+        }
+    });
+    logger.info('Screen changed', { screen: screenId });
+}
+
+// Dashboard Section Management
+function showDashboardSection(section) {
+    // Hide all sections first
+    const sections = document.querySelectorAll('.dashboard-section');
+    sections.forEach(s => s.style.display = 'none');
+    
+    // Show the selected section
+    const targetSection = document.getElementById(`${section}Section`);
+    if (targetSection) {
+        targetSection.style.display = 'block';
+    }
+    
+    // Update navigation
+    const navLinks = document.querySelectorAll('.dashboard-nav a');
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('onclick')?.includes(section)) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Load section-specific data
+    if (section === 'profile') {
+        loadUserProfile();
+    } else if (section === 'documents') {
+        loadDocuments();
+    } else if (section === 'family') {
+        loadFamilyMembers();
+    }
+    
+    logger.info('Dashboard section changed', { section });
+}
+
+// Initialize Dashboard
+function initializeDashboard() {
+    showDashboardSection('overview');
+    loadDashboardOverview();
+    setupEventListeners();
+}
+
+// Load Dashboard Overview
+async function loadDashboardOverview() {
+    try {
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+
+        const token = await user.getIdToken();
+        
+        // Load family members count for dashboard
+        loadFamilyMembersCount();
+        
+    } catch (error) {
+        logger.error('Error loading dashboard overview', error);
+    }
+}
+
+
+
+// Navigation Management
 function updateNavigation(isLoggedIn) {
-    const navLinks = document.getElementById('navLinks');
+    const navLinks = document.querySelector('.nav-links');
     if (navLinks) {
         if (isLoggedIn) {
             navLinks.innerHTML = `
@@ -141,269 +202,671 @@ function updateNavigation(isLoggedIn) {
     }
 }
 
-function showScreen(screenId) {
-    const screens = document.querySelectorAll('.main-content');
-    screens.forEach(screen => screen.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
-    logger.info('Screen changed', { screen: screenId });
+// Alert System
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alertContainer');
+    if (!alertContainer) return;
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        ${message}
+    `;
+    
+    alertContainer.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 5000);
 }
 
-function showDashboardSection(section) {
-    // Hide all sections first
-    const sections = document.querySelectorAll('.dashboard-section');
-    sections.forEach(s => s.style.display = 'none');
-    
-    // Update sidebar active state
-    const sidebarLinks = document.querySelectorAll('.sidebar-menu a');
-    sidebarLinks.forEach(link => link.classList.remove('active'));
-    
-    // Show the requested section
-    const targetSection = document.getElementById(section + 'Section');
-    if (targetSection) {
-        targetSection.style.display = 'block';
-        
-        // Update active sidebar link
-        const activeLink = document.querySelector(`.sidebar-menu a[onclick*="${section}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
-        
-        // Load section-specific data
-        if (section === 'documents') {
-            loadDocuments();
-        } else if (section === 'family') {
-            loadFamilyMembers();
-            loadFamilyInvitations();
-        } else if (section === 'profile') {
-            loadUserProfile();
-        } else if (section === 'overview') {
-            loadDashboardOverview();
-        }
+// Logout function
+async function logout() {
+    try {
+        await auth.signOut();
+        showAlert('Logged out successfully!', 'success');
+        logger.info('User logged out');
+    } catch (error) {
+        logger.error('Logout error', error);
+        showAlert('Error logging out', 'error');
     }
 }
 
-// Document Management Functions
-async function loadDocuments() {
-    const documentsGrid = document.getElementById('documentsGrid');
-    if (!documentsGrid) return;
+// Login Form Handler
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('loginBtnText');
+    const loader = document.getElementById('loginLoader');
     
     try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/documents`, {
-            method: 'GET',
+        // Show loading state
+        submitBtn.classList.add('hidden');
+        loader?.classList.remove('hidden');
+        
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        
+        // Sign in with email and password
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        logger.info('User logged in successfully', { uid: userCredential.user.uid });
+        showAlert('Login successful!', 'success');
+        
+        // The auth state listener will handle the redirect to dashboard
+    } catch (error) {
+        logger.error('Login error', error);
+        let errorMessage = 'Login failed. Please try again.';
+        
+        // Handle specific error cases
+        if (error.code) {
+            switch(error.code) {
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                    errorMessage = 'Invalid email or password.';
+                    break;
+                case 'auth/too-many-requests':
+                    errorMessage = 'Too many failed attempts. Please try again later.';
+                    break;
+                case 'auth/user-disabled':
+                    errorMessage = 'This account has been disabled.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Please enter a valid email address.';
+                    break;
+            }
+        }
+        
+        showAlert(errorMessage, 'error');
+    } finally {
+        // Reset form and loading state
+        if (submitBtn) submitBtn.classList.remove('hidden');
+        if (loader) loader.classList.add('hidden');
+    }
+});
+
+// Register Form Handler
+document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('registerBtnText');
+    const loader = document.getElementById('registerLoader');
+    const form = e.target;
+    
+    try {
+        // Show loading state
+        submitBtn?.classList.add('hidden');
+        loader?.classList.remove('hidden');
+        
+        const email = form.querySelector('#registerEmail').value.trim();
+        const password = form.querySelector('#registerPassword').value;
+        const confirmPassword = form.querySelector('#confirmPassword').value;
+        const fullName = form.querySelector('#registerName')?.value.trim() || '';
+        
+        // Basic validation
+        if (password !== confirmPassword) {
+            throw { code: 'passwords-dont-match', message: 'Passwords do not match' };
+        }
+        
+        if (password.length < 6) {
+            throw { code: 'weak-password', message: 'Password must be at least 6 characters' };
+        }
+        
+        // Create user with Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        
+        // Update user profile with display name if provided
+        if (fullName) {
+            await userCredential.user.updateProfile({
+                displayName: fullName
+            });
+        }
+        
+        // Send email verification
+        await userCredential.user.sendEmailVerification();
+        
+        logger.info('User registered successfully', { uid: userCredential.user.uid });
+        showAlert('Registration successful! Please check your email to verify your account.', 'success');
+        
+        // Reset form
+        form.reset();
+        
+        // Redirect to login after a short delay
+        setTimeout(() => showScreen('loginScreen'), 2000);
+        
+    } catch (error) {
+        logger.error('Registration error', error);
+        let errorMessage = 'Registration failed. Please try again.';
+        
+        // Handle specific error cases
+        if (error.code) {
+            switch (error.code) {
+                case 'auth/email-already-in-use':
+                    errorMessage = 'An account with this email already exists.';
+                    break;
+                case 'auth/weak-password':
+                case 'weak-password':
+                    errorMessage = 'Password should be at least 6 characters.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Please enter a valid email address.';
+                    break;
+                case 'passwords-dont-match':
+                    errorMessage = 'Passwords do not match.';
+                    break;
+                case 'auth/operation-not-allowed':
+                    errorMessage = 'Email/password accounts are not enabled.';
+                    break;
+                default:
+                    errorMessage = error.message || errorMessage;
+            }
+        }
+        
+        showAlert(errorMessage, 'error');
+    } finally {
+        // Reset loading state
+        submitBtn?.classList.remove('hidden');
+        loader?.classList.add('hidden');
+    }
+});
+
+// Family invitation form handler
+document.addEventListener('DOMContentLoaded', function() {
+    const inviteFamilyForm = document.getElementById('inviteFamilyForm');
+    if (inviteFamilyForm) {
+        inviteFamilyForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitButton = this.querySelector('button[type="submit"]');
+            if (submitButton && submitButton.disabled) {
+                return; // Prevent multiple submissions
+            }
+            
+            const inviteEmail = document.getElementById('inviteEmail').value.trim();
+            const relationship = document.getElementById('memberRelationship').value;
+            
+            if (!inviteEmail || !relationship) {
+                showAlert('Please fill in all fields', 'error');
+                return;
+            }
+            
+            // Disable submit button
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Sending...';
+            }
+
+            // Family invitation functionality will be implemented later
+            showAlert('Family features are being redesigned. Please check back later.', 'info');
+            
+            // Re-enable submit button
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Send Invitation';
+            }
+        });
+    }
+});
+
+
+// Modal management
+function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'block';
+        modal.classList.add('active');
+        logger.info('Modal shown', { modalId });
+    }
+}
+
+function hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+        logger.info('Modal hidden', { modalId });
+    }
+}
+
+// Profile Management Functions
+async function loadUserProfile() {
+    try {
+        if (!currentUser) return;
+        
+        const profileName = document.getElementById('profileName');
+        const profileEmail = document.getElementById('profileEmail');
+        const profilePhone = document.getElementById('profilePhone');
+        const profileAddress = document.getElementById('profileAddress');
+        
+        if (profileName) profileName.value = currentUser.displayName || '';
+        if (profileEmail) profileEmail.value = currentUser.email || '';
+        
+        // Load additional profile data from backend
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/users/profile`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             }
         });
         
-        const data = await response.json();
+        if (response.ok) {
+            const data = await response.json();
+            const profileData = data.profile || data;
+            if (profilePhone) profilePhone.value = profileData.phone || '';
+            if (profileAddress) profileAddress.value = profileData.address || '';
+        }
         
-        if (data.success && data.documents) {
-            if (data.documents.length === 0) {
+        logger.info('User profile loaded successfully');
+    } catch (error) {
+        logger.error('Error loading user profile', error);
+    }
+}
+
+async function saveUserProfile() {
+    try {
+        if (!currentUser) return;
+        
+        const profileName = document.getElementById('profileName')?.value;
+        const profilePhone = document.getElementById('profilePhone')?.value;
+        const profileAddress = document.getElementById('profileAddress')?.value;
+        
+        // Update Firebase profile
+        if (profileName && profileName !== currentUser.displayName) {
+            await currentUser.updateProfile({
+                displayName: profileName
+            });
+        }
+        
+        // Update backend profile
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/users/profile`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: profileName,
+                phone: profilePhone,
+                address: profileAddress
+            })
+        });
+        
+        if (response.ok) {
+            showAlert('Profile updated successfully!', 'success');
+            logger.info('User profile updated successfully');
+        } else {
+            throw new Error('Failed to update profile');
+        }
+        
+    } catch (error) {
+        logger.error('Error saving user profile', error);
+        showAlert('Failed to update profile. Please try again.', 'error');
+    }
+}
+
+
+// Load documents for documents section
+async function loadDocuments() {
+    const documentsGrid = document.getElementById('documentsGrid');
+    if (!documentsGrid) return;
+    
+    try {
+        documentsGrid.innerHTML = '<div style="text-align: center; padding: 20px;">Loading documents...</div>';
+        
+        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
+        const response = await fetch(`${API_BASE_URL}/documents`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const documents = data.documents || [];
+            
+            if (documents.length === 0) {
                 documentsGrid.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-file-alt" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
                         <p>No documents uploaded yet</p>
-                        <p style="color: #666; font-size: 0.9rem;">Click "Add Document" to upload your first document</p>
+                        <button class="btn" onclick="showDashboardSection('upload')">Upload Your First Document</button>
                     </div>
                 `;
                 return;
             }
             
-            documentsGrid.innerHTML = data.documents.map(doc => `
+            documentsGrid.innerHTML = documents.map(doc => `
                 <div class="document-card">
                     <div class="document-icon">
-                        <i class="fas ${getDocumentIcon(doc.category)}"></i>
+                        <i class="fas ${getDocumentIcon(doc.mimeType)}"></i>
                     </div>
                     <div class="document-info">
                         <h4>${doc.title}</h4>
                         <p>Uploaded: ${new Date(doc.uploadDate).toLocaleDateString()}</p>
                         <p>Size: ${formatFileSize(doc.fileSize)}</p>
-                        <span class="status ${doc.verificationStatus}">${doc.verificationStatus}</span>
                     </div>
                     <div class="document-actions">
-                        <button onclick="viewDocument('${doc._id}', '${doc.mimeType}', '${doc.title}')" class="btn-icon" title="View">
+                        <button class="btn-icon" onclick="viewDocument('${doc._id}')" title="View">
                             <i class="fas fa-eye"></i>
                         </button>
-                        <button onclick="downloadDocument('${doc._id}', '${doc.title}')" class="btn-icon" title="Download">
+                        <button class="btn-icon" onclick="downloadDocument('${doc._id}')" title="Download">
                             <i class="fas fa-download"></i>
                         </button>
-                        <button onclick="deleteDocument('${doc._id}')" class="btn-icon delete" title="Delete">
+                        <button class="btn-icon delete-btn" onclick="deleteDocument('${doc._id}')" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
             `).join('');
-        }
-    } catch (error) {
-        console.error('Error loading documents:', error);
-        showAlert('Failed to load documents', 'error');
-    }
-}
-
-// Enhanced document viewing with PDF modal support
-async function viewDocument(docId, mimeType, title) {
-    try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        
-        if (mimeType && mimeType.includes('pdf')) {
-            // Open PDF in modal viewer
-            const response = await fetch(`http://localhost:5000/api/documents/${docId}/download`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
             
-            if (response.ok) {
-                const blob = await response.blob();
-                const pdfUrl = URL.createObjectURL(blob);
-                
-                // Create PDF modal
-                const modal = document.createElement('div');
-                modal.className = 'document-modal active';
-                modal.innerHTML = `
-                    <div class="modal-content pdf-viewer">
-                        <div class="modal-header">
-                            <h3>${title}</h3>
-                            <div class="modal-actions">
-                                <button onclick="downloadDocument('${docId}', '${title}')" class="btn-secondary">
-                                    <i class="fas fa-download"></i> Download
-                                </button>
-                                <button onclick="closeDocumentModal()" class="btn-close">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="pdf-container">
-                            <iframe src="${pdfUrl}" width="100%" height="600px" frameborder="0"></iframe>
-                        </div>
-                    </div>
-                `;
-                
-                document.body.appendChild(modal);
-                
-                // Add escape key listener
-                const escapeHandler = (e) => {
-                    if (e.key === 'Escape') {
-                        closeDocumentModal();
-                        document.removeEventListener('keydown', escapeHandler);
-                    }
-                };
-                document.addEventListener('keydown', escapeHandler);
-                
-            } else {
-                throw new Error('Failed to load PDF');
+            // Update document count in overview
+            const totalDocsElement = document.getElementById('totalDocs');
+            if (totalDocsElement) {
+                totalDocsElement.textContent = documents.length;
             }
-        } else if (mimeType && mimeType.includes('image')) {
-            // Open image in modal
-            const response = await fetch(`http://localhost:5000/api/documents/${docId}/download`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
             
-            if (response.ok) {
-                const blob = await response.blob();
-                const imageUrl = URL.createObjectURL(blob);
-                
-                const modal = document.createElement('div');
-                modal.className = 'document-modal active';
-                modal.innerHTML = `
-                    <div class="modal-content image-viewer">
-                        <div class="modal-header">
-                            <h3>${title}</h3>
-                            <div class="modal-actions">
-                                <button onclick="downloadDocument('${docId}', '${title}')" class="btn-secondary">
-                                    <i class="fas fa-download"></i> Download
-                                </button>
-                                <button onclick="deleteDocument('${docId}')" class="btn-danger">
-                                    <i class="fas fa-trash"></i> Delete
-                                </button>
-                                <button onclick="closeDocumentModal()" class="btn-close">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="image-container">
-                            <img src="${imageUrl}" alt="${title}" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
-                        </div>
-                    </div>
-                `;
-                
-                document.body.appendChild(modal);
-                
-                // Add escape key listener
-                const escapeHandler = (e) => {
-                    if (e.key === 'Escape') {
-                        closeDocumentModal();
-                        document.removeEventListener('keydown', escapeHandler);
-                    }
-                };
-                document.addEventListener('keydown', escapeHandler);
-                
-            } else {
-                throw new Error('Failed to load image');
-            }
         } else {
-            // For other file types, trigger download
-            downloadDocument(docId, title);
+            documentsGrid.innerHTML = '<div class="error-state">Failed to load documents</div>';
         }
     } catch (error) {
-        console.error('Error viewing document:', error);
-        showAlert('Failed to view document', 'error');
+        logger.error('Error loading documents', error);
+        documentsGrid.innerHTML = '<div class="error-state">Error loading documents</div>';
     }
 }
 
-function closeDocumentModal() {
-    const modal = document.querySelector('.document-modal');
-    if (modal) {
-        modal.remove();
+// Setup event listeners
+function setupEventListeners() {
+    // Upload form handler
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', handleDocumentUpload);
+    }
+    
+    // Family invitation form handler
+    const inviteFamilyForm = document.getElementById('inviteFamilyForm');
+    if (inviteFamilyForm) {
+        inviteFamilyForm.addEventListener('submit', handleFamilyInvitation);
     }
 }
 
-async function downloadDocument(docId, title) {
+// Family Management Functions
+async function loadFamilyMembers() {
     try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
+        const token = currentUser ? await currentUser.getIdToken() : null;
+        if (!token) return;
         
-        const response = await fetch(`http://localhost:5000/api/documents/${docId}/download`, {
-            method: 'GET',
+        const response = await fetch(`${API_BASE_URL}/family/members`, {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
         });
         
         if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = title || 'document';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            showAlert('Document downloaded successfully', 'success');
+            const data = await response.json();
+            displayFamilyMembers(data.members || []);
+            displayPendingInvitations(data.pendingInvitations || []);
         } else {
-            throw new Error('Download failed');
+            displayFamilyMembers([]);
+            displayPendingInvitations([]);
         }
     } catch (error) {
-        console.error('Error downloading document:', error);
-        showAlert('Failed to download document', 'error');
+        console.error('Error loading family members:', error);
+        displayFamilyMembers([]);
+        displayPendingInvitations([]);
     }
 }
 
-async function deleteDocument(docId) {
-    if (!confirm('Are you sure you want to delete this document?')) {
+async function loadFamilyMembersCount() {
+    try {
+        const token = currentUser ? await currentUser.getIdToken() : null;
+        if (!token) return;
+        
+        const response = await fetch(`${API_BASE_URL}/family/count`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const familyMembersElement = document.getElementById('familyMembers');
+            if (familyMembersElement) {
+                familyMembersElement.textContent = data.count || 0;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading family members count:', error);
+    }
+}
+
+function displayFamilyMembers(members) {
+    const container = document.getElementById('familyMembersList');
+    if (!container) return;
+    
+    if (members.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
+                <h3>No Family Members Yet</h3>
+                <p>Start by inviting family members to share documents securely.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = members.map(member => `
+        <div class="family-member-card">
+            <div class="member-info">
+                <h4>${member.name || member.email}</h4>
+                <span class="member-relationship">${member.relationship}</span>
+                <p class="member-email">${member.email}</p>
+                <span class="member-status status-${member.status}">${member.status}</span>
+            </div>
+            <div class="member-actions">
+                ${member.status === 'active' ? `
+                    <button class="btn btn-sm btn-danger" onclick="removeFamilyMember('${member._id}')">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayPendingInvitations(invitations) {
+    const container = document.getElementById('pendingInvitationsList');
+    if (!container) return;
+    
+    if (invitations.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    // Separate sent and received invitations
+    const sentInvitations = invitations.filter(inv => inv.inviterId === currentUser?.uid);
+    const receivedInvitations = invitations.filter(inv => inv.email === currentUser?.email);
+    
+    let html = '';
+    
+    // Show sent invitations
+    if (sentInvitations.length > 0) {
+        html += `
+            <div class="pending-invitations-section">
+                <h3>Sent Invitations (${sentInvitations.length})</h3>
+                ${sentInvitations.map(invitation => `
+                    <div class="invitation-card">
+                        <div class="invitation-info">
+                            <strong>${invitation.email}</strong>
+                            <span class="invitation-relationship">${invitation.relationship}</span>
+                            <p class="invitation-date">Invited on ${new Date(invitation.invitedAt).toLocaleDateString()}</p>
+                        </div>
+                        <div class="invitation-actions">
+                            <button class="btn btn-sm btn-secondary" onclick="resendInvitation('${invitation._id}')">
+                                <i class="fas fa-paper-plane"></i> Resend
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="cancelInvitation('${invitation._id}')">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    // Show received invitations
+    if (receivedInvitations.length > 0) {
+        html += `
+            <div class="pending-invitations-section">
+                <h3>Received Invitations (${receivedInvitations.length})</h3>
+                ${receivedInvitations.map(invitation => `
+                    <div class="invitation-card">
+                        <div class="invitation-info">
+                            <strong>From: ${invitation.inviterName || invitation.inviterEmail}</strong>
+                            <span class="invitation-relationship">${invitation.relationship}</span>
+                            <p class="invitation-date">Invited on ${new Date(invitation.invitedAt).toLocaleDateString()}</p>
+                        </div>
+                        <div class="invitation-actions">
+                            <button class="btn btn-sm btn-primary" onclick="acceptInvitation('${invitation.inviteToken}')">
+                                <i class="fas fa-check"></i> Accept
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="rejectInvitation('${invitation.inviteToken}')">
+                                <i class="fas fa-times"></i> Decline
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+
+async function acceptInvitation(token) {
+    try {
+        const authToken = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/family/accept/${token}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            loadFamilyMembers();
+            loadFamilyMembersCount();
+        } else {
+            showAlert(data.message || 'Failed to accept invitation', 'error');
+        }
+    } catch (error) {
+        console.error('Error accepting invitation:', error);
+        showAlert('Failed to accept invitation. Please try again.', 'error');
+    }
+}
+
+async function rejectInvitation(token) {
+    if (!confirm('Are you sure you want to decline this invitation?')) {
         return;
     }
     
     try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
+        const authToken = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/family/reject-invitation/${token}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
         
-        const response = await fetch(`${API_BASE_URL}/documents/${docId}`, {
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            loadFamilyMembers();
+        } else {
+            showAlert(data.message || 'Failed to decline invitation', 'error');
+        }
+    } catch (error) {
+        console.error('Error declining invitation:', error);
+        showAlert('Failed to decline invitation. Please try again.', 'error');
+    }
+}
+
+// Modal Management
+function showInviteModal() {
+    const modal = document.getElementById('inviteFamilyModal');
+    if (modal) {
+        modal.style.display = 'block';
+        modal.classList.add('active');
+    }
+}
+
+function hideInviteModal() {
+    const modal = document.getElementById('inviteFamilyModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+        // Reset form
+        const form = document.getElementById('inviteFamilyForm');
+        if (form) form.reset();
+    }
+}
+
+// Handle family invitation form submission
+async function handleFamilyInvitation(event) {
+    event.preventDefault();
+    
+    const email = document.getElementById('inviteEmail').value;
+    const relationship = document.getElementById('memberRelationship').value;
+    
+    if (!email || !relationship) {
+        showAlert('Please fill in all fields', 'error');
+        return;
+    }
+    
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/family/invite`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, relationship })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            hideInviteModal();
+            loadFamilyMembers(); // Refresh the list
+            loadFamilyMembersCount(); // Update dashboard count
+        } else {
+            showAlert(data.message || 'Failed to send invitation', 'error');
+        }
+    } catch (error) {
+        console.error('Error sending invitation:', error);
+        showAlert('Failed to send invitation. Please try again.', 'error');
+    }
+}
+
+async function removeFamilyMember(memberId) {
+    if (!confirm('Are you sure you want to remove this family member?')) {
+        return;
+    }
+    
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/family/members/${memberId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -413,112 +876,52 @@ async function deleteDocument(docId) {
         
         const data = await response.json();
         
-        if (data.success) {
-            showAlert('Document deleted successfully', 'success');
-            loadDocuments(); // Refresh the list
-            loadDashboardOverview(); // Update dashboard stats
-            closeDocumentModal(); // Close modal if open
+        if (response.ok && data.success) {
+            showAlert('Family member removed successfully', 'success');
+            loadFamilyMembers(); // Refresh the list
+            loadFamilyMembersCount(); // Update dashboard count
         } else {
-            throw new Error(data.message || 'Delete failed');
+            showAlert(data.message || 'Failed to remove family member', 'error');
         }
     } catch (error) {
-        console.error('Error deleting document:', error);
-        showAlert('Failed to delete document', 'error');
+        console.error('Error removing family member:', error);
+        showAlert('Failed to remove family member. Please try again.', 'error');
     }
 }
 
-// Family Management Functions
-async function loadFamilyInvitations() {
-    try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/family/invitations`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        const invitations = data.invitations || [];
-        
-        const familySection = document.getElementById('familySection');
-        if (!familySection) return;
-        
-        // Remove existing invitations section
-        const existingInvites = familySection.querySelector('.family-invitations');
-        if (existingInvites) {
-            existingInvites.remove();
-        }
-        
-        if (invitations.length > 0) {
-            let invitationsHTML = `
-                <div class="family-invitations" style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 10px 0; color: #1976d2;">📨 Pending Family Invitations</h4>
-            `;
-            
-            invitations.forEach(invite => {
-                invitationsHTML += `
-                    <div style="background: white; border-radius: 5px; padding: 10px; margin: 5px 0; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>${invite.invitedBy}</strong> invited you as <em>${invite.relationship}</em>
-                            <br><small>Invited: ${new Date(invite.invitedAt).toLocaleDateString()}</small>
-                        </div>
-                        <div>
-                            <button class="btn-small btn-primary" onclick="acceptFamilyInvite('${invite._id}')" style="margin-right: 5px;">
-                                ✅ Accept
-                            </button>
-                            <button class="btn-small btn-danger" onclick="declineFamilyInvite('${invite._id}')">
-                                ❌ Decline
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            invitationsHTML += '</div>';
-            familySection.insertAdjacentHTML('afterbegin', invitationsHTML);
-        }
-    } catch (error) {
-        console.error('❌ Error loading family invitations:', error);
-    }
-}
-
-async function acceptFamilyInvite(inviteId) {
-    try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/family/accept/${inviteId}`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showAlert('Family invitation accepted!', 'success');
-            await loadFamilyMembers();
-            await loadFamilyInvitations();
-            await loadDashboardOverview();
-        } else {
-            showAlert(data.message || 'Failed to accept invitation', 'error');
-        }
-    } catch (error) {
-        console.error('❌ Error accepting invitation:', error);
-        showAlert('Failed to accept invitation', 'error');
-    }
-}
-
-async function declineFamilyInvite(inviteId) {
-    if (!confirm('Are you sure you want to decline this family invitation?')) {
+async function cancelInvitation(invitationId) {
+    if (!confirm('Are you sure you want to cancel this invitation?')) {
         return;
     }
     
     try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/family/decline/${inviteId}`, {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/family/invitations/${invitationId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showAlert('Invitation cancelled successfully', 'success');
+            loadFamilyMembers(); // Refresh the list
+        } else {
+            showAlert(data.message || 'Failed to cancel invitation', 'error');
+        }
+    } catch (error) {
+        console.error('Error cancelling invitation:', error);
+        showAlert('Failed to cancel invitation. Please try again.', 'error');
+    }
+}
+
+async function resendInvitation(invitationId) {
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/family/invitations/${invitationId}/resend`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -528,150 +931,89 @@ async function declineFamilyInvite(inviteId) {
         
         const data = await response.json();
         
-        if (data.success) {
-            showAlert('Family invitation declined', 'success');
-            await loadFamilyInvitations();
+        if (response.ok && data.success) {
+            showAlert('Invitation resent successfully', 'success');
         } else {
-            showAlert(data.message || 'Failed to decline invitation', 'error');
+            showAlert(data.message || 'Failed to resend invitation', 'error');
         }
     } catch (error) {
-        console.error('❌ Error declining invitation:', error);
-        showAlert('Failed to decline invitation', 'error');
+        console.error('Error resending invitation:', error);
+        showAlert('Failed to resend invitation. Please try again.', 'error');
     }
 }
 
-async function loadFamilyMembers() {
+// Handle document upload
+async function handleDocumentUpload(event) {
+    event.preventDefault();
+    
+    const fileInput = document.getElementById('fileInput');
+    const docType = document.getElementById('docType');
+    const docName = document.getElementById('docName');
+    const docDescription = document.getElementById('docDescription');
+    const uploadBtn = document.getElementById('uploadBtnText');
+    const uploadLoader = document.getElementById('uploadLoader');
+    
+    if (!fileInput.files[0]) {
+        showAlert('Please select a file to upload', 'error');
+        return;
+    }
+    
+    // Show loading state
+    if (uploadBtn) uploadBtn.textContent = 'Uploading...';
+    if (uploadLoader) uploadLoader.classList.remove('hidden');
+    
     try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/family`, {
-            method: 'GET',
+        const formData = new FormData();
+        formData.append('document', fileInput.files[0]);
+        formData.append('title', docName.value);
+        formData.append('classification', docType.value);
+        formData.append('description', docDescription.value || '');
+        
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+            method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
         });
         
         const data = await response.json();
-        const familyGrid = document.getElementById('familyGrid');
         
-        if (familyGrid && data.success) {
-            const members = data.familyMembers || [];
+        if (data.success) {
+            showAlert('Document uploaded successfully!', 'success');
             
-            if (members.length === 0) {
-                familyGrid.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-users" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
-                        <p>No family members added yet</p>
-                        <p style="color: #666; font-size: 0.9rem;">Invite family members to share documents securely</p>
+            // Reset form
+            uploadForm.reset();
+            const uploadArea = document.querySelector('.upload-area');
+            if (uploadArea) {
+                uploadArea.innerHTML = `
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
                     </div>
+                    <h3>Click to upload or drag and drop</h3>
+                    <p>PDF, JPG, PNG files only (Max 10MB)</p>
                 `;
-                return;
             }
             
-            familyGrid.innerHTML = members.map(member => `
-                <div class="family-card">
-                    <div class="family-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="family-info">
-                        <h4>${member.memberEmail}</h4>
-                        <p>Relation: ${member.relationship}</p>
-                        <p>Status: ${member.status}</p>
-                        <span class="status ${member.status}">${member.status}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-    } catch (error) {
-        console.error('Error loading family members:', error);
-    }
-}
-
-// Dashboard Functions
-async function initializeDashboard() {
-    if (!currentUser) return;
-    
-    try {
-        // Load real user profile data from Firebase
-        const userDisplayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
-        const userEmail = currentUser.email;
-        const userPhone = currentUser.phoneNumber || '';
-        
-        // Update profile fields with real data
-        const profileNameEl = document.getElementById('profileName');
-        const profileEmailEl = document.getElementById('profileEmail');
-        const profilePhoneEl = document.getElementById('profilePhone');
-        
-        if (profileNameEl) profileNameEl.value = userDisplayName;
-        if (profileEmailEl) profileEmailEl.value = userEmail;
-        if (profilePhoneEl) profilePhoneEl.value = userPhone;
-        
-        // Update welcome message
-        const welcomeEl = document.querySelector('.welcome-message h2');
-        if (welcomeEl) {
-            welcomeEl.textContent = `Welcome back, ${userDisplayName}!`;
-        }
-        
-        loadDashboardOverview();
-        logger.info('Dashboard initialized');
-    } catch (error) {
-        logger.error('Dashboard initialization error', error);
-    }
-}
-
-async function loadDashboardOverview() {
-    try {
-        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/documents/stats`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+            // Refresh documents if on documents section
+            if (document.getElementById('documentsSection').style.display !== 'none') {
+                loadDocuments();
             }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.stats) {
-                // Update dashboard stats with real data
-                const totalDocsElement = document.getElementById('totalDocs');
-                const sharedDocsElement = document.getElementById('sharedDocs');
-                const familyCountElement = document.getElementById('familyCount');
-                
-                if (totalDocsElement) totalDocsElement.textContent = `${data.stats.totalDocuments || 0} documents`;
-                if (sharedDocsElement) sharedDocsElement.textContent = `${data.stats.sharedDocuments || 0} documents`;
-                if (familyCountElement) familyCountElement.textContent = `${data.stats.familyMembers || 0} members`;
-                
-                console.log('📊 Dashboard stats updated:', data.stats);
-            }
+        } else {
+            showAlert(data.message || 'Upload failed', 'error');
         }
     } catch (error) {
-        console.error('Error loading dashboard stats:', error);
+        logger.error('Upload error', error);
+        showAlert('Upload failed. Please try again.', 'error');
+    } finally {
+        // Reset loading state
+        if (uploadBtn) uploadBtn.textContent = 'Upload Document';
+        if (uploadLoader) uploadLoader.classList.add('hidden');
     }
 }
 
-function loadUserProfile() {
-    if (!currentUser) return;
-    
-    // Load real user data from Firebase
-    const profileName = document.getElementById('profileName');
-    const profileEmail = document.getElementById('profileEmail');
-    const profilePhone = document.getElementById('profilePhone');
-    
-    if (profileName) profileName.value = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
-    if (profileEmail) profileEmail.value = currentUser.email || '';
-    if (profilePhone) profilePhone.value = currentUser.phoneNumber || '';
-}
-
-// Utility Functions
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
+// Utility functions
 function getDocumentIcon(type) {
     const icons = {
         'aadhaar': 'fa-id-card',
@@ -685,246 +1027,184 @@ function getDocumentIcon(type) {
     return icons[type] || 'fa-file-alt';
 }
 
-// Alert System
-function showAlert(message, type = 'success') {
-    const alertContainer = document.getElementById('alertContainer') || document.body;
-    const alertId = 'alert_' + Date.now();
-    
-    const alertHTML = `
-        <div id="${alertId}" class="alert alert-${type} show" style="position: fixed; top: 20px; right: 20px; z-index: 10000; padding: 15px; border-radius: 5px; color: white; background: ${type === 'success' ? '#28a745' : '#dc3545'};">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
-            ${message}
-        </div>
-    `;
-    
-    alertContainer.insertAdjacentHTML('beforeend', alertHTML);
-    logger.info('Alert shown', { message, type });
-    
-    setTimeout(() => {
-        const alert = document.getElementById(alertId);
-        if (alert) alert.remove();
-    }, 5000);
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Authentication Functions
-async function logout() {
+// View document in modal
+async function viewDocument(documentId) {
     try {
-        await auth.signOut();
-        showAlert('Logged out successfully!', 'success');
-        logger.info('User logged out');
-    } catch (error) {
-        logger.error('Logout error', error);
-        showAlert('Error logging out', 'error');
-    }
-}
-
-// Missing Functions
-function addFamilyMember() {
-    showAlert('Add family member functionality would open here', 'info');
-}
-
-function triggerFileInput() {
-    const fileInput = document.getElementById('fileInput');
-    if (fileInput) {
-        fileInput.click();
-    }
-}
-
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-        selectedFile = file;
-        const uploadArea = document.querySelector('.upload-area');
-        if (uploadArea) {
-            uploadArea.innerHTML = `
-                <div class="upload-icon">
-                    <i class="fas fa-file-check"></i>
+        if (!currentUser) {
+            showAlert('Please log in to view documents', 'error');
+            return;
+        }
+        
+        const token = await currentUser.getIdToken();
+        
+        // Get document metadata
+        const response = await fetch(`${API_BASE_URL}/documents`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const data = await response.json();
+        const docData = data.documents.find(doc => doc._id === documentId);
+        
+        if (!docData) {
+            showAlert('Document not found', 'error');
+            return;
+        }
+        
+        currentViewingDocument = docData;
+        
+        // Set modal title
+        document.getElementById('documentViewerTitle').textContent = docData.title;
+        
+        // Load document preview
+        const preview = document.getElementById('documentPreview');
+        
+        if (docData.mimeType && docData.mimeType.startsWith('image/')) {
+            // For images, create authenticated request
+            const imageResponse = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (imageResponse.ok) {
+                const blob = await imageResponse.blob();
+                const imageUrl = URL.createObjectURL(blob);
+                preview.innerHTML = `<img src="${imageUrl}" alt="${docData.title}" onload="URL.revokeObjectURL('${imageUrl}')">`;
+            } else {
+                throw new Error('Failed to load image');
+            }
+        } else if (docData.mimeType === 'application/pdf') {
+            // For PDFs, create authenticated request and blob URL
+            const pdfResponse = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (pdfResponse.ok) {
+                const blob = await pdfResponse.blob();
+                const pdfUrl = URL.createObjectURL(blob);
+                preview.innerHTML = `<iframe src="${pdfUrl}" type="application/pdf" style="width: 100%; height: 500px;"></iframe>`;
+            } else {
+                throw new Error('Failed to load PDF');
+            }
+        } else {
+            // For other files, show download option
+            preview.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <i class="fas fa-file" style="font-size: 60px; color: #666; margin-bottom: 20px;"></i>
+                    <h3>${docData.title}</h3>
+                    <p>This file type cannot be previewed. Click download to view the file.</p>
+                    <button class="btn" onclick="downloadDocument('${documentId}')">
+                        <i class="fas fa-download"></i> Download File
+                    </button>
                 </div>
-                <h3>File Selected: ${file.name}</h3>
-                <p>Size: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
             `;
         }
-        console.log('File selected:', file.name);
+        
+        // Show modal
+        showModal('documentViewerModal');
+        
+    } catch (error) {
+        console.error('Error viewing document:', error);
+        showAlert('Failed to load document', 'error');
     }
 }
 
-// Event Listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Document upload form
-    const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('fileInput');
-            const docName = document.getElementById('docName');
-            const docType = document.getElementById('docType');
-            const docDescription = document.getElementById('docDescription');
-            
-            console.log('File input element:', fileInput);
-            console.log('Files:', fileInput ? fileInput.files : 'no element');
-            console.log('Selected file variable:', selectedFile);
-            
-            if (!fileInput || !fileInput.files[0]) {
-                showAlert('Please select a file to upload', 'error');
-                return;
-            }
-            
-            if (!docName || !docName.value.trim()) {
-                showAlert('Please enter a document name', 'error');
-                return;
-            }
-            
-            const uploadBtn = document.querySelector('#uploadForm button[type="submit"]');
-            const originalText = uploadBtn ? uploadBtn.textContent : 'Upload Document';
-            
-            try {
-                if (uploadBtn) uploadBtn.textContent = 'Uploading...';
-                
-                // Create FormData for file upload
-                const formData = new FormData();
-                formData.append('document', fileInput.files[0]);
-                formData.append('title', docName.value);
-                formData.append('category', docType.value);
-                if (docDescription && docDescription.value) {
-                    formData.append('description', docDescription.value);
-                }
-                
-                // Upload to backend
-                const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-                
-                const response = await fetch(`${API_BASE_URL}/documents/upload`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert('Document uploaded successfully!', 'success');
-                    
-                    // Reset form
-                    uploadForm.reset();
-                    const uploadArea = document.querySelector('.upload-area');
-                    if (uploadArea) {
-                        uploadArea.innerHTML = `
-                            <div class="upload-icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                            </div>
-                            <h3>Click to upload or drag and drop</h3>
-                            <p>PDF, JPG, PNG files only (Max 10MB)</p>
-                        `;
-                    }
-                    
-                    // Refresh documents if on documents section
-                    const documentsSection = document.getElementById('documentsSection');
-                    if (documentsSection && documentsSection.style.display !== 'none') {
-                        loadDocuments();
-                    }
-                    
-                    // Update dashboard stats
-                    loadDashboardOverview();
-                } else {
-                    showAlert(data.message || 'Upload failed', 'error');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                showAlert('Upload failed. Please try again.', 'error');
-            } finally {
-                if (uploadBtn) uploadBtn.textContent = originalText;
-            }
-        });
+// Download current document
+async function downloadCurrentDocument() {
+    if (currentViewingDocument) {
+        await downloadDocument(currentViewingDocument._id);
     }
-    // Login form
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitBtn = document.getElementById('loginBtnText');
-            const loader = document.getElementById('loginLoader');
-            
-            try {
-                if (submitBtn) submitBtn.classList.add('hidden');
-                if (loader) loader.classList.remove('hidden');
-                
-                const email = document.getElementById('loginEmail').value;
-                const password = document.getElementById('loginPassword').value;
-                
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                logger.info('User logged in successfully', { uid: userCredential.user.uid });
-                showAlert('Login successful!', 'success');
-                
-            } catch (error) {
-                logger.error('Login error', error);
-                let errorMessage = 'Login failed. Please try again.';
-                
-                if (error.code === 'auth/user-not-found') {
-                    errorMessage = 'No account found with this email.';
-                } else if (error.code === 'auth/wrong-password') {
-                    errorMessage = 'Incorrect password.';
-                } else if (error.code === 'auth/invalid-email') {
-                    errorMessage = 'Invalid email address.';
-                }
-                
-                showAlert(errorMessage, 'error');
-            } finally {
-                if (submitBtn) submitBtn.classList.remove('hidden');
-                if (loader) loader.classList.add('hidden');
+}
+
+
+// Download document
+async function downloadDocument(documentId) {
+    try {
+        if (!currentUser) {
+            showAlert('Please log in to download documents', 'error');
+            return;
+        }
+        
+        const token = await currentUser.getIdToken();
+        
+        const response = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
             }
         });
+        
+        if (!response.ok) {
+            throw new Error('Download failed');
+        }
+        
+        // Get filename from response headers or use default
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = 'document';
+        if (contentDisposition) {
+            const matches = /filename="([^"]*)"/.exec(contentDisposition);
+            if (matches && matches[1]) {
+                filename = matches[1];
+            }
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showAlert('Document downloaded successfully', 'success');
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        showAlert('Failed to download document', 'error');
+    }
+}
+
+
+// Delete document
+async function deleteDocument(docId) {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+        return;
     }
     
-    // Register form
-    const registerForm = document.getElementById('registerForm');
-    if (registerForm) {
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitBtn = document.getElementById('registerBtnText');
-            const loader = document.getElementById('registerLoader');
-            
-            try {
-                if (submitBtn) submitBtn.classList.add('hidden');
-                if (loader) loader.classList.remove('hidden');
-                
-                const formData = {
-                    fullName: document.getElementById('fullName').value,
-                    email: document.getElementById('email').value,
-                    phone: document.getElementById('phone').value,
-                    aadhaar: document.getElementById('aadhaar').value,
-                    password: document.getElementById('password').value,
-                    confirmPassword: document.getElementById('confirmPassword').value
-                };
-                
-                // Validation
-                if (formData.password !== formData.confirmPassword) {
-                    throw new Error('Passwords do not match');
-                }
-                
-                if (formData.aadhaar.length !== 12 || !/^\d{12}$/.test(formData.aadhaar)) {
-                    throw new Error('Please enter a valid 12-digit Aadhaar number');
-                }
-                
-                // Create user account in Firebase
-                const userCredential = await auth.createUserWithEmailAndPassword(formData.email, formData.password);
-                
-                // Update Firebase user profile
-                await userCredential.user.updateProfile({
-                    displayName: formData.fullName
-                });
-                
-                logger.info('User registered successfully', { uid: userCredential.user.uid });
-                showAlert('Account created successfully!', 'success');
-                
-            } catch (error) {
-                logger.error('Registration error', error);
-                showAlert(error.message, 'error');
-            } finally {
-                if (submitBtn) submitBtn.classList.remove('hidden');
-                if (loader) loader.classList.add('hidden');
+    try {
+        const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
+        
+        const response = await fetch(`${API_BASE_URL}/documents/${docId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
             }
         });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('Document deleted successfully', 'success');
+            loadDocuments(); // Refresh the document list
+        } else {
+            showAlert(data.message || 'Failed to delete document', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Delete error:', error);
+        showAlert('Failed to delete document', 'error');
     }
-});
+}

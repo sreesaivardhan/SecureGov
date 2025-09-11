@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Family Invitation - SecureGov</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .invitation-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .invitation-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .invitation-logo {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .invitation-title {
+            font-size: 28px;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        .invitation-subtitle {
+            color: #6b7280;
+            font-size: 16px;
+        }
+        .family-info-card {
+            background: #f8fafc;
+            border-left: 4px solid #2563eb;
+            padding: 25px;
+            margin: 25px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .family-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        .family-description {
+            color: #6b7280;
+            margin-bottom: 15px;
+        }
+        .invitation-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #4b5563;
+        }
+        .role-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .benefits-list {
+            background: #f0f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .benefits-list h4 {
+            color: #1e40af;
+            margin-bottom: 15px;
+        }
+        .benefits-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .benefits-list li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .benefits-list li::before {
+            content: "✓";
+            color: #059669;
+            font-weight: bold;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .btn-accept {
+            background: #059669;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .btn-accept:hover {
+            background: #047857;
+        }
+        .btn-decline {
+            background: #dc2626;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .btn-decline:hover {
+            background: #b91c1c;
+        }
+        .expiry-warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        .success-message {
+            background: #d1fae5;
+            border: 1px solid #86efac;
+            color: #059669;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        .login-prompt {
+            text-align: center;
+            padding: 40px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .login-prompt h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+        }
+        .login-prompt p {
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+        .btn-login {
+            background: #2563eb;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="invitation-container">
+        <div class="invitation-header">
+            <div class="invitation-logo">🛡️</div>
+            <h1 class="invitation-title">Family Group Invitation</h1>
+            <p class="invitation-subtitle">You've been invited to join a family group</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingSpinner" class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading invitation details...</p>
+        </div>
+
+        <!-- Error Messages -->
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <!-- Login Prompt -->
+        <div id="loginPrompt" class="login-prompt" style="display: none;">
+            <h3>Sign In Required</h3>
+            <p>Please sign in to your SecureGov account to accept this invitation.</p>
+            <a href="../index.html" class="btn-login">Sign In</a>
+        </div>
+
+        <!-- Invitation Details -->
+        <div id="invitationContent" style="display: none;">
+            <div class="family-info-card">
+                <div class="family-name" id="familyName">Loading...</div>
+                <div class="family-description" id="familyDescription"></div>
+                
+                <div class="invitation-meta">
+                    <div class="meta-item">
+                        <i class="fas fa-user"></i>
+                        <span>Invited by: <strong id="inviterName">Loading...</strong></span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-user-tag"></i>
+                        <span>Your role: <span class="role-badge" id="memberRole">Loading...</span></span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>Invited on: <span id="invitedDate">Loading...</span></span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-clock"></i>
+                        <span>Expires: <span id="expiryDate">Loading...</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="benefits-list">
+                <h4><i class="fas fa-star"></i> As a family member, you'll be able to:</h4>
+                <ul>
+                    <li>Share important documents securely with family members</li>
+                    <li>Access documents shared by other family members</li>
+                    <li>Collaborate on family-related paperwork and records</li>
+                    <li>Maintain organized and secure family document storage</li>
+                    <li>Receive notifications about family document updates</li>
+                </ul>
+            </div>
+
+            <div id="expiryWarning" class="expiry-warning" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>This invitation will expire soon. Please accept it before the expiry date.</span>
+            </div>
+
+            <div class="action-buttons">
+                <button id="acceptBtn" class="btn-accept" onclick="acceptInvitation()">
+                    <i class="fas fa-check"></i>
+                    Accept Invitation
+                </button>
+                <button id="declineBtn" class="btn-decline" onclick="declineInvitation()">
+                    <i class="fas fa-times"></i>
+                    Decline
+                </button>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="color: #6b7280; font-size: 14px;">
+                    <i class="fas fa-shield-alt"></i>
+                    This invitation is secure and can only be accepted by the invited email address.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "demo-key",
+            authDomain: "securegov-demo.firebaseapp.com",
+            projectId: "securegov-demo",
+            storageBucket: "securegov-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+    </script>
+    <script src="../js/accept-invitation.js"></script>
+</body>
+</html>

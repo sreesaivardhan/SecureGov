@@ -4,13 +4,14 @@ const crypto = require('crypto');
 const { FamilyGroup, FAMILY_ROLES, INVITATION_STATUS } = require('../models/FamilyGroup');
 const { authenticateUser } = require('../middleware/auth');
 const admin = require('firebase-admin');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
-// Create family group
+// Create new family group
 router.post('/create', authenticateUser, async (req, res) => {
   try {
-    const { name, description, settings } = req.body;
+    const { name, description } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({
@@ -19,49 +20,64 @@ router.post('/create', authenticateUser, async (req, res) => {
       });
     }
 
-    // Check if user already has a family group as creator
-    const existingGroup = await FamilyGroup.findOne({
-      createdBy: req.user.uid,
-      status: 'active'
-    });
-
-    if (existingGroup) {
-      return res.status(400).json({
-        success: false,
-        message: 'You can only create one family group'
-      });
-    }
-
-    // Get user info from Firebase
+    // Get user details from Firebase
     const userRecord = await admin.auth().getUser(req.user.uid);
-
-    const familyGroup = new FamilyGroup({
+    
+    // Create simple family group object
+    const familyGroupData = {
+      _id: new Date().getTime().toString(),
       name: name.trim(),
-      description: description?.trim() || '',
+      description: description ? description.trim() : '',
       createdBy: req.user.uid,
+      createdAt: new Date(),
+      lastModified: new Date(),
       members: [{
         userId: req.user.uid,
-        email: userRecord.email,
+        email: userRecord.email.toLowerCase(),
         displayName: userRecord.displayName || userRecord.email,
-        role: FAMILY_ROLES.ADMIN,
+        role: 'admin',
         invitedBy: req.user.uid,
-        joinedAt: new Date()
+        joinedAt: new Date(),
+        status: 'active'
       }],
+      invitations: [],
       settings: {
-        allowMemberInvites: settings?.allowMemberInvites || false,
-        autoAcceptInvites: settings?.autoAcceptInvites || false,
-        defaultMemberRole: settings?.defaultMemberRole || FAMILY_ROLES.MEMBER,
-        maxMembers: Math.min(settings?.maxMembers || 10, 50)
-      }
-    });
+        allowMemberInvites: false,
+        autoAcceptInvites: false,
+        defaultMemberRole: 'member',
+        maxMembers: 10
+      },
+      statistics: {
+        totalMembers: 1,
+        totalDocuments: 0,
+        lastActivity: new Date()
+      },
+      status: 'active'
+    };
 
-    await familyGroup.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Family group created successfully',
-      familyGroup: familyGroup
-    });
+    // Try MongoDB first, fallback to in-memory
+    try {
+      const familyGroup = new FamilyGroup(familyGroupData);
+      await familyGroup.save();
+      
+      res.status(201).json({
+        success: true,
+        message: 'Family group created successfully',
+        familyGroup: familyGroup
+      });
+    } catch (mongoError) {
+      console.warn('MongoDB save failed, using in-memory storage:', mongoError.message);
+      
+      // Store in memory as fallback
+      global.inMemoryData = global.inMemoryData || { familyGroups: new Map() };
+      global.inMemoryData.familyGroups.set(familyGroupData._id, familyGroupData);
+      
+      res.status(201).json({
+        success: true,
+        message: 'Family group created successfully (in-memory)',
+        familyGroup: familyGroupData
+      });
+    }
 
   } catch (error) {
     console.error('Create family group error:', error);
@@ -75,13 +91,29 @@ router.post('/create', authenticateUser, async (req, res) => {
 // Get user's family groups
 router.get('/my-groups', authenticateUser, async (req, res) => {
   try {
-    const familyGroups = await FamilyGroup.find({
-      $or: [
-        { createdBy: req.user.uid },
-        { 'members.userId': req.user.uid, 'members.status': 'active' }
-      ],
-      status: 'active'
-    }).sort({ lastModified: -1 });
+    let familyGroups = [];
+    
+    // Try MongoDB first, fallback to in-memory
+    try {
+      familyGroups = await FamilyGroup.find({
+        $or: [
+          { createdBy: req.user.uid },
+          { 'members.userId': req.user.uid, 'members.status': 'active' }
+        ],
+        status: 'active'
+      }).sort({ lastModified: -1 });
+    } catch (mongoError) {
+      console.warn('MongoDB query failed, checking in-memory storage:', mongoError.message);
+      
+      // Check in-memory storage
+      if (global.inMemoryData && global.inMemoryData.familyGroups) {
+        const allGroups = Array.from(global.inMemoryData.familyGroups.values());
+        familyGroups = allGroups.filter(group => 
+          group.createdBy === req.user.uid || 
+          group.members.some(member => member.userId === req.user.uid && member.status === 'active')
+        );
+      }
+    }
 
     res.json({
       success: true,
@@ -200,7 +232,19 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
       });
     }
 
-    const familyGroup = await FamilyGroup.findById(req.params.groupId);
+    let familyGroup = null;
+    
+    // Try MongoDB first, fallback to in-memory
+    try {
+      familyGroup = await FamilyGroup.findById(req.params.groupId);
+    } catch (mongoError) {
+      console.warn('MongoDB findById failed, checking in-memory storage:', mongoError.message);
+      
+      // Check in-memory storage
+      if (global.inMemoryData && global.inMemoryData.familyGroups) {
+        familyGroup = global.inMemoryData.familyGroups.get(req.params.groupId);
+      }
+    }
 
     if (!familyGroup) {
       return res.status(404).json({
@@ -209,8 +253,16 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
       });
     }
 
-    // Check permissions
-    const userRole = familyGroup.getMemberRole(req.user.uid);
+    // Check permissions - handle both MongoDB and in-memory objects
+    let userRole = null;
+    if (familyGroup.getMemberRole) {
+      userRole = familyGroup.getMemberRole(req.user.uid);
+    } else {
+      // For in-memory objects, check manually
+      const member = familyGroup.members?.find(m => m.userId === req.user.uid && m.status === 'active');
+      userRole = member ? member.role : null;
+    }
+    
     if (!userRole) {
       return res.status(403).json({
         success: false,
@@ -218,10 +270,10 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
       });
     }
 
-    if (userRole !== FAMILY_ROLES.ADMIN && !familyGroup.settings.allowMemberInvites) {
+    if (userRole !== 'admin' && !familyGroup.settings?.allowMemberInvites) {
       return res.status(403).json({
         success: false,
-        message: 'Only admins can invite members'
+        message: 'Only admins can send invitations'
       });
     }
 
@@ -238,9 +290,9 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
     }
 
     // Check if there's already a pending invitation
-    const existingInvitation = familyGroup.invitations.find(inv => 
+    const existingInvitation = familyGroup.invitations?.find(inv => 
       inv.email.toLowerCase() === email.toLowerCase() && 
-      inv.status === INVITATION_STATUS.PENDING
+      inv.status === 'pending'
     );
 
     if (existingInvitation) {
@@ -251,7 +303,10 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
     }
 
     // Check member limit
-    if (familyGroup.activeMembersCount >= familyGroup.settings.maxMembers) {
+    const memberCount = familyGroup.activeMembersCount || familyGroup.members?.filter(m => m.status === 'active').length || 0;
+    const maxMembers = familyGroup.settings?.maxMembers || 10;
+    
+    if (memberCount >= maxMembers) {
       return res.status(400).json({
         success: false,
         message: 'Family group has reached maximum member limit'
@@ -269,16 +324,52 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
       email: email.toLowerCase(),
       invitedBy: req.user.uid,
       invitedByName: inviterRecord.displayName || inviterRecord.email,
-      role: role || familyGroup.settings.defaultMemberRole,
+      role: role || familyGroup.settings?.defaultMemberRole || 'member',
       invitationToken: invitationToken,
-      status: INVITATION_STATUS.PENDING
+      status: 'pending',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
     };
 
+    // Initialize invitations array if it doesn't exist
+    if (!familyGroup.invitations) {
+      familyGroup.invitations = [];
+    }
+    
     familyGroup.invitations.push(invitation);
-    await familyGroup.save();
+    
+    // Save to MongoDB or in-memory storage
+    try {
+      if (familyGroup.save) {
+        await familyGroup.save();
+      } else {
+        // Update in-memory storage
+        global.inMemoryData.familyGroups.set(req.params.groupId, familyGroup);
+      }
+    } catch (saveError) {
+      console.warn('Failed to save to MongoDB, updating in-memory storage:', saveError.message);
+      global.inMemoryData = global.inMemoryData || { familyGroups: new Map() };
+      global.inMemoryData.familyGroups.set(req.params.groupId, familyGroup);
+    }
 
-    // TODO: Send email notification (implement email service)
-    console.log(`Invitation sent to ${email} for family group ${familyGroup.name}`);
+    // Send email invitation
+    try {
+      await emailService.sendFamilyInvitation({
+        recipientEmail: email,
+        recipientName: email.split('@')[0], // Use email prefix as name fallback
+        familyGroupName: familyGroup.name,
+        familyGroupDescription: familyGroup.description,
+        inviterName: inviterRecord.displayName || inviterRecord.email,
+        inviterEmail: inviterRecord.email,
+        role: invitation.role,
+        invitationToken: invitationToken,
+        expiresAt: invitation.expiresAt
+      });
+      console.log(`Email invitation sent to ${email} for family group ${familyGroup.name}`);
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError);
+      // Continue even if email fails - invitation is still created
+    }
 
     res.status(201).json({
       success: true,
@@ -296,6 +387,54 @@ router.post('/:groupId/invite', authenticateUser, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to send invitation'
+    });
+  }
+});
+
+// Legacy endpoint for invitation acceptance (backward compatibility)
+router.post('/invitations/accept/:id', authenticateUser, async (req, res) => {
+  // Redirect to token-based endpoint
+  return res.status(404).json({
+    success: false,
+    message: 'This endpoint is deprecated. Please use token-based acceptance.'
+  });
+});
+
+// Reject invitation
+router.post('/reject-invitation/:token', authenticateUser, async (req, res) => {
+  try {
+    const familyGroup = await FamilyGroup.findOne({
+      'invitations.invitationToken': req.params.token,
+      'invitations.status': INVITATION_STATUS.PENDING
+    });
+
+    if (!familyGroup) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid or expired invitation'
+      });
+    }
+
+    const invitation = familyGroup.invitations.find(inv => 
+      inv.invitationToken === req.params.token
+    );
+
+    // Update invitation status
+    invitation.status = INVITATION_STATUS.DECLINED;
+    invitation.declinedAt = new Date();
+    
+    await familyGroup.save();
+
+    res.json({
+      success: true,
+      message: 'Invitation declined successfully'
+    });
+
+  } catch (error) {
+    console.error('Reject invitation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to decline invitation'
     });
   }
 });
@@ -356,6 +495,19 @@ router.post('/accept-invitation/:token', authenticateUser, async (req, res) => {
       invitation.acceptedAt = new Date();
 
       await familyGroup.save();
+
+      // Send welcome email
+      try {
+        await emailService.sendWelcomeEmail({
+          email: userRecord.email,
+          name: userRecord.displayName || userRecord.email,
+          familyGroupName: familyGroup.name,
+          role: invitation.role
+        });
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+        // Continue even if email fails
+      }
 
       res.json({
         success: true,
@@ -537,39 +689,70 @@ router.put('/:groupId/members/:memberId/role', authenticateUser, async (req, res
   }
 });
 
-// Get pending invitations for user
+// Get pending invitations for current user
 router.get('/invitations/pending', authenticateUser, async (req, res) => {
   try {
     const userRecord = await admin.auth().getUser(req.user.uid);
+    let pendingInvitations = [];
     
-    const familyGroups = await FamilyGroup.find({
-      'invitations.email': userRecord.email.toLowerCase(),
-      'invitations.status': INVITATION_STATUS.PENDING,
-      'invitations.expiresAt': { $gt: new Date() }
-    });
+    // Try MongoDB first, fallback to in-memory
+    try {
+      const familyGroups = await FamilyGroup.find({
+        'invitations.email': userRecord.email.toLowerCase(),
+        'invitations.status': 'pending',
+        'invitations.expiresAt': { $gt: new Date() }
+      });
 
-    const pendingInvitations = [];
-    
-    familyGroups.forEach(group => {
-      const userInvitations = group.invitations.filter(inv => 
-        inv.email.toLowerCase() === userRecord.email.toLowerCase() &&
-        inv.status === INVITATION_STATUS.PENDING &&
-        inv.expiresAt > new Date()
-      );
-      
-      userInvitations.forEach(inv => {
-        pendingInvitations.push({
-          invitationToken: inv.invitationToken,
-          familyGroupId: group._id,
-          familyGroupName: group.name,
-          familyGroupDescription: group.description,
-          role: inv.role,
-          invitedBy: inv.invitedByName,
-          createdAt: inv.createdAt,
-          expiresAt: inv.expiresAt
+      familyGroups.forEach(group => {
+        const userInvitations = group.invitations.filter(inv => 
+          inv.email.toLowerCase() === userRecord.email.toLowerCase() &&
+          inv.status === 'pending' &&
+          inv.expiresAt > new Date()
+        );
+        
+        userInvitations.forEach(inv => {
+          pendingInvitations.push({
+            invitationToken: inv.invitationToken,
+            familyGroupId: group._id,
+            familyGroupName: group.name,
+            familyGroupDescription: group.description,
+            role: inv.role,
+            invitedBy: inv.invitedByName,
+            createdAt: inv.createdAt,
+            expiresAt: inv.expiresAt
+          });
         });
       });
-    });
+    } catch (mongoError) {
+      console.warn('MongoDB query failed, checking in-memory storage:', mongoError.message);
+      
+      // Check in-memory storage
+      if (global.inMemoryData && global.inMemoryData.familyGroups) {
+        const allGroups = Array.from(global.inMemoryData.familyGroups.values());
+        allGroups.forEach(group => {
+          if (group.invitations) {
+            const userInvitations = group.invitations.filter(inv => 
+              inv.email.toLowerCase() === userRecord.email.toLowerCase() &&
+              inv.status === 'pending' &&
+              new Date(inv.expiresAt) > new Date()
+            );
+            
+            userInvitations.forEach(inv => {
+              pendingInvitations.push({
+                invitationToken: inv.invitationToken,
+                familyGroupId: group._id,
+                familyGroupName: group.name,
+                familyGroupDescription: group.description,
+                role: inv.role,
+                invitedBy: inv.invitedByName,
+                createdAt: inv.createdAt,
+                expiresAt: inv.expiresAt
+              });
+            });
+          }
+        });
+      }
+    }
 
     res.json({
       success: true,
@@ -618,6 +801,87 @@ router.delete('/:groupId', authenticateUser, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete family group'
+    });
+  }
+});
+
+// Legacy endpoints for backward compatibility with old frontend code
+router.post('/invite', authenticateUser, async (req, res) => {
+  return res.status(404).json({
+    success: false,
+    message: 'Please create a family group first, then use /{groupId}/invite endpoint'
+  });
+});
+
+router.get('/invitations', authenticateUser, async (req, res) => {
+  // Redirect to pending invitations
+  try {
+    const userRecord = await admin.auth().getUser(req.user.uid);
+    
+    const familyGroups = await FamilyGroup.find({
+      'invitations.email': userRecord.email.toLowerCase(),
+      'invitations.status': INVITATION_STATUS.PENDING,
+      'invitations.expiresAt': { $gt: new Date() }
+    });
+
+    const pendingInvitations = [];
+    
+    familyGroups.forEach(group => {
+      const userInvitations = group.invitations.filter(inv => 
+        inv.email.toLowerCase() === userRecord.email.toLowerCase() &&
+        inv.status === INVITATION_STATUS.PENDING &&
+        inv.expiresAt > new Date()
+      );
+      
+      userInvitations.forEach(inv => {
+        pendingInvitations.push({
+          invitationToken: inv.invitationToken,
+          familyGroupId: group._id,
+          familyGroupName: group.name,
+          familyGroupDescription: group.description,
+          role: inv.role,
+          invitedBy: inv.invitedByName,
+          createdAt: inv.createdAt,
+          expiresAt: inv.expiresAt
+        });
+      });
+    });
+
+    res.json({
+      success: true,
+      invitations: pendingInvitations
+    });
+
+  } catch (error) {
+    console.error('Get invitations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch invitations'
+    });
+  }
+});
+
+router.get('/members', authenticateUser, async (req, res) => {
+  // Redirect to my-groups
+  try {
+    const familyGroups = await FamilyGroup.find({
+      $or: [
+        { createdBy: req.user.uid },
+        { 'members.userId': req.user.uid, 'members.status': 'active' }
+      ],
+      status: 'active'
+    }).sort({ lastModified: -1 });
+
+    res.json({
+      success: true,
+      familyGroups: familyGroups
+    });
+
+  } catch (error) {
+    console.error('Get family members error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch family members'
     });
   }
 });

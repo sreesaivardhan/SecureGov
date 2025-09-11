@@ -26,7 +26,13 @@ const multer = require('multer');
 const Grid = require('gridfs-stream');
 const admin = require('firebase-admin');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/secureGovDocs';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/secureGovDocs';
+
+// Simple in-memory storage as fallback
+const inMemoryData = {
+  familyGroups: new Map(),
+  users: new Map()
+};
 const PORT = process.env.PORT || 5000;
 const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_ADMIN_KEY_PATH || path.join(__dirname, 'serviceAccountKey.json');
 
@@ -353,14 +359,17 @@ app.post('/api/share/:id', authenticateUser, async (req, res) => {
    Route handlers
    --------------------------- */
 // Import route modules
-const documentsRouter = require('./routes/documents');
-const familyRouter = require('./routes/family');
-const profileRouter = require('./routes/profile');
+const familyRoutes = require('./routes/family');
+const documentRoutes = require('./routes/documents');
+const userRoutes = require('./routes/users');
 
-// Use routes
-app.use('/api/documents', documentsRouter);
-app.use('/api/family', familyRouter);
-app.use('/api/profile', profileRouter);
+// Use routes with proper middleware
+app.use('/api/family', familyRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/profile', require('./routes/profile'));
+
+// Keep existing upload route from server.js since it's already implemented
+// app.use('/api/documents', documentRoutes); // Comment out to avoid conflicts
 
 /* ---------------------------
    Health & debug endpoints
