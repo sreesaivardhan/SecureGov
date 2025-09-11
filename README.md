@@ -73,7 +73,7 @@ A comprehensive, secure platform for managing government documents with advanced
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/sreesaivhan/SecureGov.git
+   git clone https://github.com/sreesaivardhan/SecureGov.git
    cd securegov-project
    ```
 
