@@ -9,7 +9,7 @@ const logger = require('./utils/logger');
 const errorHandler = require('./utils/errorHandler');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // Middleware
 app.use(cors());
@@ -29,14 +29,27 @@ app.get('/test', (req, res) => {
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 let mongoClient;
+let isMongoConnected = false;
 
 async function connectMongoDB() {
   try {
-    mongoClient = new MongoClient(MONGODB_URI);
+    if (!MONGODB_URI || MONGODB_URI === 'mongodb://localhost:27017') {
+      console.warn('⚠️ MongoDB URI not configured. Database features disabled.');
+      return;
+    }
+    
+    mongoClient = new MongoClient(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
     await mongoClient.connect();
-    console.log('✅ MongoDB connected');
+    await mongoClient.db('admin').command({ ping: 1 });
+    isMongoConnected = true;
+    console.log('✅ MongoDB connected successfully');
   } catch (err) {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('❌ MongoDB connection error:', err.message);
+    console.warn('⚠️ Continuing without MongoDB. Database features disabled.');
+    isMongoConnected = false;
   }
 }
 
@@ -46,10 +59,22 @@ connectMongoDB();
 try {
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
     // Production: Use environment variables
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    
+    // Handle different private key formats
+    if (privateKey.includes('\\n')) {
+      privateKey = privateKey.replace(/\\n/g, '\n');
+    }
+    
+    // Ensure proper PEM format
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
+    }
+    
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        privateKey: privateKey,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       })
     });
@@ -64,16 +89,25 @@ try {
       });
       console.log('✅ Firebase Admin initialized from service account file');
     } else {
-      console.warn('⚠️ Firebase service account key not found. Some features may not work.');
+      console.warn('⚠️ Firebase service account key not found. Authentication features disabled.');
     }
   }
 } catch (err) {
   console.error('❌ Firebase Admin initialization error:', err);
+  console.warn('⚠️ Continuing without Firebase Admin. Authentication features disabled.');
 }
 
 // Authentication middleware
 async function verifyToken(req, res, next) {
   try {
+    // Check if Firebase Admin is initialized
+    if (!admin.apps.length) {
+      return res.status(503).json({
+        success: false,
+        message: 'Authentication service unavailable. Please check server configuration.'
+      });
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw errorHandler.createError('AUTH_TOKEN_MISSING', {
@@ -129,30 +163,48 @@ const upload = multer({
   }
 });
 
+// Database helper function
+async function withDatabase(operation) {
+  if (!isMongoConnected) {
+    throw new Error('Database not available');
+  }
+  const client = new MongoClient(MONGODB_URI);
+  try {
+    await client.connect();
+    const db = client.db('secureGovDocs');
+    return await operation(db);
+  } finally {
+    await client.close();
+  }
+}
+
 // User sync endpoint
 app.post('/api/users/sync', verifyToken, async (req, res) => {
   try {
     console.log('👤 Syncing user:', req.user.uid);
     
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db('secureGovDocs');
+    if (!isMongoConnected) {
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Database service unavailable' 
+      });
+    }
     
-    const userData = {
-      firebaseUID: req.user.uid,
-      email: req.user.email,
-      name: req.user.name || req.user.email?.split('@')[0] || 'User',
-      lastLogin: new Date(),
-      updatedAt: new Date()
-    };
-    
-    await db.collection('users').updateOne(
-      { firebaseUID: req.user.uid },
-      { $set: userData },
-      { upsert: true }
-    );
-    
-    await client.close();
+    await withDatabase(async (db) => {
+      const userData = {
+        firebaseUID: req.user.uid,
+        email: req.user.email,
+        name: req.user.name || req.user.email?.split('@')[0] || 'User',
+        lastLogin: new Date(),
+        updatedAt: new Date()
+      };
+      
+      await db.collection('users').updateOne(
+        { firebaseUID: req.user.uid },
+        { $set: userData },
+        { upsert: true }
+      );
+    });
     
     res.json({ success: true, message: 'User synced successfully' });
   } catch (error) {
@@ -166,18 +218,22 @@ app.get('/api/documents', verifyToken, async (req, res) => {
   try {
     console.log('📄 Fetching documents for user:', req.user.uid);
     
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db('secureGovDocs');
+    if (!isMongoConnected) {
+      return res.json({
+        success: true,
+        documents: [],
+        message: 'Database service unavailable'
+      });
+    }
     
-    const documents = await db.collection('documents')
-      .find({ userId: req.user.uid })
-      .sort({ uploadDate: -1 })
-      .toArray();
+    const documents = await withDatabase(async (db) => {
+      return await db.collection('documents')
+        .find({ userId: req.user.uid })
+        .sort({ uploadDate: -1 })
+        .toArray();
+    });
     
     console.log('📄 Found documents:', documents.length);
-    
-    await client.close();
     
     res.json({
       success: true,
@@ -284,38 +340,50 @@ app.get('/api/dashboard/stats', verifyToken, async (req, res) => {
   try {
     console.log('📊 Fetching stats for user:', req.user.uid);
     
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db('secureGovDocs');
-    
-    const totalDocuments = await db.collection('documents')
-      .countDocuments({ userId: req.user.uid });
-    
-    const recentUploads = await db.collection('documents')
-      .countDocuments({ 
-        userId: req.user.uid,
-        uploadDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    if (!isMongoConnected) {
+      return res.json({
+        success: true,
+        stats: {
+          totalDocuments: 0,
+          recentUploads: 0,
+          sharedDocuments: 0,
+          storageUsed: 0,
+          familyMembers: 0
+        },
+        message: 'Database service unavailable'
       });
+    }
     
-    const documents = await db.collection('documents')
-      .find({ userId: req.user.uid })
-      .toArray();
+    const stats = await withDatabase(async (db) => {
+      const totalDocuments = await db.collection('documents')
+        .countDocuments({ userId: req.user.uid });
+      
+      const recentUploads = await db.collection('documents')
+        .countDocuments({ 
+          userId: req.user.uid,
+          uploadDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+        });
+      
+      const documents = await db.collection('documents')
+        .find({ userId: req.user.uid })
+        .toArray();
+      
+      const storageUsed = documents.reduce((total, doc) => total + (doc.fileSize || 0), 0);
+      
+      return {
+        totalDocuments,
+        recentUploads,
+        sharedDocuments: 0,
+        storageUsed,
+        familyMembers: 0
+      };
+    });
     
-    const storageUsed = documents.reduce((total, doc) => total + (doc.fileSize || 0), 0);
-    
-    await client.close();
-    
-    console.log('📊 Stats calculated:', { totalDocuments, recentUploads, storageUsed });
+    console.log('📊 Stats calculated:', stats);
     
     res.json({
       success: true,
-      stats: {
-        totalDocuments,
-        recentUploads,
-        sharedDocuments: 0, // TODO: Implement sharing
-        storageUsed,
-        familyMembers: 0 // Family features disabled
-      }
+      stats: stats
     });
   } catch (error) {
     console.error('❌ Stats error:', error);
@@ -336,9 +404,12 @@ app.post('/api/documents/upload', verifyToken, upload.single('document'), async 
       });
     }
 
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db('secureGovDocs');
+    if (!isMongoConnected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database service unavailable. Cannot save document metadata.'
+      });
+    }
 
     const documentData = {
       userId: req.user.uid,
@@ -353,9 +424,9 @@ app.post('/api/documents/upload', verifyToken, upload.single('document'), async 
       filePath: req.file.path
     };
 
-    const result = await db.collection('documents').insertOne(documentData);
-    
-    await client.close();
+    const result = await withDatabase(async (db) => {
+      return await db.collection('documents').insertOne(documentData);
+    });
 
     console.log('✅ Document uploaded:', result.insertedId);
 
@@ -1004,13 +1075,18 @@ app.use((req, res) => {
   errorHandler.handleError(error, req, res);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Server started successfully`, {
     port: PORT,
     environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    mongoConnected: isMongoConnected,
+    firebaseConnected: admin.apps.length > 0
   });
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Services status:`);
+  console.log(`   - MongoDB: ${isMongoConnected ? '✅ Connected' : '❌ Disconnected'}`);
+  console.log(`   - Firebase: ${admin.apps.length > 0 ? '✅ Connected' : '❌ Disconnected'}`);
 });
 
 module.exports = app;
