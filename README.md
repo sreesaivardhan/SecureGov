@@ -2,142 +2,477 @@
 
 ![SecureGov Logo](assets/images/logo.png)
 
-A comprehensive, secure platform for managing government documents with advanced family sharing, encryption, and search capabilities.
+A comprehensive, secure platform for managing government documents with advanced family sharing, authentication, and document management capabilities. This project demonstrates a full-stack web application with modern security practices and user-friendly interfaces.
 
 ## 🌟 Features
 
 ### 📄 Document Management
-- **Upload & Storage**: Secure document upload with multiple file format support
-- **Organization**: Category-based document organization (Government, Personal, Financial, Medical, Legal)
-- **Advanced Search**: Real-time search with filters by name, category, date, and content
-- **Document Actions**: View, download, print, encrypt/decrypt, and share documents
-- **File Validation**: Automatic file type and size validation
+- **Secure Upload & Storage**: Multi-format document upload (PDF, JPG, PNG) with 10MB limit
+- **Category Organization**: Organize documents by Government, Personal, Financial, Medical, Legal categories
+- **Advanced Search & Filter**: Real-time search with category and date filters
+- **Document Actions**: View, download, delete documents with proper authorization
+- **File Validation**: Automatic file type validation and size restrictions
 
 ### 👨‍👩‍👧‍👦 Family Management
-- **Family Groups**: Create and manage family groups for document sharing
-- **Secure Invitations**: Email-based invitation system with token-based security
-- **Role Management**: Control access levels for family members
+- **Family Groups**: Create and manage family groups for secure document sharing
+- **Email Invitations**: Send secure email-based invitations with token authentication
+- **Relationship Management**: Define and edit family relationships (Parent, Spouse, Child, etc.)
 - **Invitation Tracking**: Monitor pending, accepted, and rejected invitations
-- **Member Management**: Add, remove, and manage family members
+- **Member Management**: Add, remove, and manage family members with proper permissions
 
-### 🔐 Security & Privacy
-- **Firebase Authentication**: Secure user authentication and authorization
-- **Document Encryption**: Toggle encryption for sensitive documents
-- **Access Control**: User-based document access with family sharing permissions
-- **Security Logging**: Comprehensive security event tracking
-- **Token-based API**: Secure API access with Firebase ID tokens
+### 🔐 Security & Authentication
+- **Firebase Authentication**: Secure user registration and login with email/password
+- **JWT Token Verification**: Server-side token validation for API security
+- **User Authorization**: Role-based access control for documents and family features
+- **Secure API Endpoints**: Protected routes with proper authentication middleware
+- **Data Validation**: Input validation and sanitization on both client and server
 
-### 🚀 Advanced Features
-- **Real-time Notifications**: Toast notifications for user feedback
-- **Performance Optimization**: Caching, lazy loading, and debounced search
+### 🚀 Technical Features
+- **Real-time Updates**: Dynamic UI updates without page refreshes
 - **Error Handling**: Comprehensive error tracking and user-friendly messages
 - **Responsive Design**: Mobile-first design that works on all devices
-- **Progressive Web App**: PWA capabilities for offline access
+- **Performance Optimization**: Efficient data loading and caching strategies
+- **Cross-browser Compatibility**: Works on all modern browsers
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **HTML5/CSS3**: Modern semantic markup and responsive styling
-- **JavaScript (ES6+)**: Vanilla JavaScript with modern features
-- **Firebase SDK**: Authentication and real-time features
-- **Progressive Web App**: Service worker and offline capabilities
+- **HTML5/CSS3**: Semantic markup with modern styling and flexbox/grid layouts
+- **Vanilla JavaScript (ES6+)**: Modern JavaScript with async/await, modules, and DOM manipulation
+- **Firebase SDK v9**: Client-side authentication and real-time features
+- **CSS Grid & Flexbox**: Responsive layout system
+- **Font Awesome**: Icon library for enhanced UI
 
 ### Backend
-- **Node.js**: Server-side JavaScript runtime
-- **Express.js**: Web application framework
-- **MongoDB**: NoSQL database for document and user data
-- **Firebase Admin**: Server-side Firebase integration
-- **Multer**: File upload handling
+- **Node.js v18+**: Server-side JavaScript runtime
+- **Express.js v5**: Web application framework with middleware support
+- **MongoDB**: NoSQL database for document and user data storage
+- **Firebase Admin SDK**: Server-side Firebase integration for token verification
+- **Multer**: Middleware for handling multipart/form-data file uploads
+- **CORS**: Cross-Origin Resource Sharing configuration
 
-### Development & Testing
-- **Mocha/Chai**: Unit and integration testing
-- **Puppeteer**: End-to-end testing
+### Development Tools
+- **Live Server**: Development server with hot reload
+- **Mocha/Chai**: Unit and integration testing framework
+- **Puppeteer**: End-to-end browser testing
 - **NYC**: Code coverage reporting
-- **ESLint**: Code quality and consistency
+- **Nodemon**: Development server with auto-restart
 
-### Deployment
-- **Netlify**: Frontend hosting and deployment
-- **Heroku**: Backend API hosting
-- **MongoDB Atlas**: Cloud database hosting
-
-## 🚀 Quick Start
+## 🚀 Complete Setup Guide
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- MongoDB (local or MongoDB Atlas)
-- Firebase project with Authentication enabled
-- Git
+Before starting, ensure you have the following installed:
 
-### Installation
+- **Node.js v18 or higher** - [Download here](https://nodejs.org/)
+- **MongoDB** - Either local installation or MongoDB Atlas account
+- **Git** - For version control
+- **Code Editor** - VS Code recommended
+- **Web Browser** - Chrome, Firefox, or Safari
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/sreesaivardhan/SecureGov.git
-   cd securegov-project
+### Step 1: Clone and Install
+
+```bash
+# Clone the repository
+git clone https://github.com/sreesaivardhan/SecureGov.git
+cd securegov-project
+
+# Install frontend dependencies
+npm install
+
+# Install backend dependencies
+cd server
+npm install
+cd ..
+```
+
+### Step 2: Database Setup
+
+#### Option A: Local MongoDB
+```bash
+# Install MongoDB locally
+# Windows: Download from https://www.mongodb.com/try/download/community
+# macOS: brew install mongodb-community
+# Linux: Follow official MongoDB installation guide
+
+# Start MongoDB service
+# Windows: Start MongoDB service from Services
+# macOS/Linux: sudo systemctl start mongod
+```
+
+#### Option B: MongoDB Atlas (Recommended)
+1. Go to [MongoDB Atlas](https://www.mongodb.com/atlas)
+2. Create a free account and cluster
+3. Get your connection string
+4. Replace `<password>` and `<dbname>` in the connection string
+
+### Step 3: Firebase Configuration
+
+1. **Create Firebase Project**
+   - Go to [Firebase Console](https://console.firebase.google.com)
+   - Click "Create a project"
+   - Enter project name: `securegov-project`
+   - Enable Google Analytics (optional)
+
+2. **Enable Authentication**
+   - In Firebase Console, go to Authentication > Sign-in method
+   - Enable "Email/Password" provider
+   - Save changes
+
+3. **Get Firebase Config**
+   - Go to Project Settings > General
+   - Scroll to "Your apps" section
+   - Click "Web app" icon and register app
+   - Copy the Firebase configuration object
+
+4. **Update Frontend Config**
+   ```javascript
+   // Edit js/firebase-config.js
+   const firebaseConfig = {
+     apiKey: "your-api-key",
+     authDomain: "your-project.firebaseapp.com",
+     projectId: "your-project-id",
+     storageBucket: "your-project.appspot.com",
+     messagingSenderId: "123456789",
+     appId: "your-app-id"
+   };
    ```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   cd server && npm install
-   ```
+5. **Setup Service Account (Backend)**
+   - In Firebase Console, go to Project Settings > Service accounts
+   - Click "Generate new private key"
+   - Download the JSON file
+   - Rename it to `serviceAccountKey.json`
+   - Place it in the `server/` directory
 
-3. **Configure Firebase**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
-   - Enable Authentication with Email/Password
-   - Download service account key and place in `server/config/`
-   - Update `js/firebase-config.js` with your Firebase config
+### Step 4: Environment Configuration
 
-4. **Configure MongoDB**
-   ```bash
-   # Set environment variable
-   export MONGODB_URI="mongodb://localhost:27017/secureGovDocs"
-   # Or use MongoDB Atlas connection string
-   ```
+Create environment variables for the backend:
 
-5. **Start the development servers**
-   ```bash
-   # Start backend server
-   cd server && node server-clean.js
+```bash
+# Windows (Command Prompt)
+set MONGODB_URI=mongodb://127.0.0.1:27017/secureGovDocs
+set PORT=5000
 
-   # Start frontend server (new terminal)
-   npm run dev
-   ```
+# Windows (PowerShell)
+$env:MONGODB_URI="mongodb://127.0.0.1:27017/secureGovDocs"
+$env:PORT="5000"
 
-6. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
+# macOS/Linux
+export MONGODB_URI="mongodb://127.0.0.1:27017/secureGovDocs"
+export PORT=5000
 
-## 📁 Project Structure
+# For MongoDB Atlas, use your connection string:
+# mongodb+srv://username:password@cluster.mongodb.net/secureGovDocs
+```
+
+### Step 5: Start the Application
+
+#### Terminal 1 - Backend Server
+```bash
+cd server
+npm start
+# or for development with auto-restart:
+npm run dev
+```
+
+You should see:
+```
+✅ MongoDB connected
+✅ Firebase Admin initialized
+🚀 Server running on port 5000
+```
+
+#### Terminal 2 - Frontend Server
+```bash
+# From project root directory
+npm start
+# or
+npm run dev
+```
+
+You should see:
+```
+Starting up http-server, serving ./
+Available on:
+  http://127.0.0.1:3000
+  http://localhost:3000
+```
+
+### Step 6: Access the Application
+
+1. **Open your browser** and navigate to: `http://localhost:3000`
+2. **Register a new account** using the signup form
+3. **Verify the setup** by checking both terminals for successful connections
+
+## 🧪 Testing All Functionalities
+
+### 1. User Authentication Testing
+
+**Registration:**
+1. Go to `http://localhost:3000`
+2. Click "Sign Up" 
+3. Enter email and password
+4. Click "Create Account"
+5. ✅ Should redirect to dashboard
+
+**Login:**
+1. Click "Sign Out" if logged in
+2. Click "Sign In"
+3. Enter credentials
+4. ✅ Should redirect to dashboard
+
+### 2. Document Management Testing
+
+**Upload Documents:**
+1. Click "Upload Document" button
+2. Select a PDF, JPG, or PNG file (max 10MB)
+3. Enter title and description
+4. Select category
+5. Click "Upload"
+6. ✅ Document should appear in documents list
+
+**View Documents:**
+1. Click on any document in the list
+2. ✅ Document should open in new tab/window
+
+**Download Documents:**
+1. Click download icon on any document
+2. ✅ File should download to your computer
+
+**Delete Documents:**
+1. Click delete (trash) icon on any document
+2. Confirm deletion
+3. ✅ Document should be removed from list
+
+### 3. Family Management Testing
+
+**Send Invitations:**
+1. Click "Family" in navigation
+2. Click "Invite Family Member"
+3. Enter email address and relationship
+4. Click "Send Invitation"
+5. ✅ Invitation should appear in pending list
+
+**Manage Family Members:**
+1. View family members list
+2. Edit relationships using edit button
+3. Remove members using delete button
+4. ✅ Changes should be reflected immediately
+
+### 4. Dashboard Testing
+
+**Statistics Verification:**
+1. Go to dashboard
+2. Check document count matches uploaded documents
+3. Check family member count
+4. ✅ All statistics should be accurate and update in real-time
+
+## 🔧 Server Management Commands
+
+### Backend Server Commands
+```bash
+cd server
+
+# Start production server
+npm start
+
+# Start development server with auto-restart
+npm run dev
+
+# Install dependencies
+npm install
+
+# Check server status
+curl http://localhost:5000/test
+```
+
+### Frontend Server Commands
+```bash
+# Start frontend development server
+npm start
+npm run dev
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Install dependencies
+npm install
+```
+
+## 📁 Detailed Project Structure
 
 ```
 securegov-project/
-├── assets/                 # Static assets (images, icons, docs)
-├── components/            # Reusable HTML components
-├── css/                   # Stylesheets
-│   ├── style.css         # Main stylesheet
-│   ├── documents.css     # Document-specific styles
-│   ├── family.css        # Family management styles
-│   └── profile.css       # User profile styles
-├── js/                    # JavaScript modules
-│   ├── app.js            # Main application logic
-│   ├── advanced-features.js # Advanced functionality
-│   ├── errorHandler.js   # Error handling utilities
-│   ├── performance.js    # Performance optimization
-│   └── firebase-config.js # Firebase configuration
-├── pages/                 # Additional HTML pages
-├── server/                # Backend server code
-│   ├── config/           # Configuration files
-│   ├── middleware/       # Express middleware
-│   ├── models/           # Data models
-│   ├── utils/            # Utility functions
-│   └── server-clean.js   # Main server file
-├── tests/                 # Test suites
-│   ├── unit/             # Unit tests
-│   ├── integration/      # Integration tests
-│   └── run-tests.js      # Test runner
-├── index.html            # Main HTML file
-├── netlify.toml          # Netlify configuration
-├── _redirects            # Netlify redirects
-└── package.json          # Dependencies and scripts
+├── 📁 assets/                    # Static assets
+│   ├── 📁 docs/                 # Documentation files
+│   ├── 📁 icons/                # Application icons
+│   └── 📁 images/               # Images and logos
+├── 📁 components/               # Reusable HTML components
+│   ├── footer.html              # Footer component
+│   └── header.html              # Header component
+├── 📁 css/                      # Stylesheets
+│   ├── style.css               # Main application styles
+│   ├── documents.css           # Document management styles
+│   ├── family.css              # Family management styles
+│   ├── family-dashboard.css    # Family dashboard styles
+│   └── profile.css             # User profile styles
+├── 📁 js/                       # JavaScript modules
+│   ├── app.js                  # Main application logic
+│   ├── advanced-features.js    # Advanced functionality
+│   ├── documents.js            # Document management
+│   ├── family.js               # Family management
+│   ├── firebase-config.js      # Firebase configuration
+│   ├── config.js               # Application configuration
+│   └── errorHandler.js         # Error handling utilities
+├── 📁 pages/                    # Additional HTML pages
+│   ├── dashboard.html          # User dashboard
+│   ├── documents.html          # Document management page
+│   ├── family.html             # Family management page
+│   └── profile.html            # User profile page
+├── 📁 server/                   # Backend server code
+│   ├── 📁 config/              # Server configuration
+│   │   └── firebase-storage.js # Firebase storage config
+│   ├── 📁 middleware/          # Express middleware
+│   │   ├── auth.js             # Authentication middleware
+│   │   ├── authMiddleware.js   # Additional auth middleware
+│   │   └── security.js         # Security middleware
+│   ├── 📁 models/              # Data models
+│   │   ├── Document.js         # Document model
+│   │   ├── FamilyGroup.js      # Family group model
+│   │   └── UserProfile.js      # User profile model
+│   ├── server-simple.js        # Main server file
+│   ├── package.json            # Server dependencies
+│   └── serviceAccountKey.json  # Firebase service account (you need to add this)
+├── 📁 tests/                    # Test suites
+│   ├── 📁 unit/                # Unit tests
+│   ├── 📁 integration/         # Integration tests
+│   └── run-tests.js            # Test runner
+├── index.html                  # Main HTML entry point
+├── package.json                # Frontend dependencies and scripts
+├── netlify.toml               # Netlify deployment config
+├── _redirects                 # Netlify redirects
+├── firebase.json              # Firebase configuration
+├── .firebaserc               # Firebase project settings
+└── README.md                 # This file
+```
+
+## 🌐 API Endpoints
+
+### Authentication Endpoints
+- `POST /api/users/sync` - Sync user data with database
+- `GET /api/users/profile` - Get user profile
+- `PUT /api/users/profile` - Update user profile
+
+### Document Endpoints
+- `GET /api/documents` - Get user documents
+- `POST /api/documents/upload` - Upload new document
+- `GET /api/documents/:id/download` - Download document
+- `DELETE /api/documents/:id` - Delete document
+- `GET /api/documents/stats` - Get document statistics
+
+### Family Management Endpoints
+- `GET /api/family` - Get family members
+- `POST /api/family/invite` - Send family invitation
+- `GET /api/family/invitations` - Get pending invitations
+- `DELETE /api/family/invitations/:id` - Cancel invitation
+- `POST /api/family/invitations/:id/resend` - Resend invitation
+- `PUT /api/family/members/:id/relationship` - Update member relationship
+
+## 🔍 Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. "Connection Refused" Error
+**Problem:** Backend server not running
+**Solution:**
+```bash
+cd server
+npm start
+# Check if port 5000 is available
+netstat -an | findstr :5000
+```
+
+#### 2. "Firebase Auth Error"
+**Problem:** Firebase configuration missing or incorrect
+**Solution:**
+1. Verify `js/firebase-config.js` has correct values
+2. Check Firebase project settings
+3. Ensure Authentication is enabled in Firebase Console
+
+#### 3. "MongoDB Connection Failed"
+**Problem:** MongoDB not running or wrong connection string
+**Solution:**
+```bash
+# Check MongoDB status
+# Windows: Check Services for MongoDB
+# macOS/Linux: sudo systemctl status mongod
+
+# Verify connection string
+echo $MONGODB_URI
+```
+
+#### 4. "File Upload Failed"
+**Problem:** File size too large or unsupported format
+**Solution:**
+- Ensure file is under 10MB
+- Use only PDF, JPG, PNG formats
+- Check browser console for detailed errors
+
+#### 5. "Token Verification Failed"
+**Problem:** Firebase service account key missing
+**Solution:**
+1. Download service account key from Firebase Console
+2. Place `serviceAccountKey.json` in `server/` directory
+3. Restart backend server
+
+### Debug Mode
+
+Enable detailed logging:
+```bash
+# Backend debug mode
+cd server
+DEBUG=* npm start
+
+# Check browser console for frontend errors
+# Press F12 in browser and check Console tab
+```
+
+## 🚀 Production Deployment
+
+### Frontend (Netlify)
+1. Push code to GitHub
+2. Connect repository to Netlify
+3. Build settings: `npm run build`
+4. Publish directory: `./`
+
+### Backend (Render/Heroku)
+1. Create account on Render or Heroku
+2. Connect GitHub repository
+3. Set environment variables:
+   - `MONGODB_URI`
+   - `FIREBASE_ADMIN_KEY_PATH`
+4. Deploy backend service
+
+## 📞 Support
+
+If you encounter any issues during setup:
+
+1. **Check the console logs** in both terminal windows
+2. **Verify all prerequisites** are installed correctly
+3. **Ensure Firebase configuration** is complete
+4. **Check MongoDB connection** is working
+5. **Review the troubleshooting section** above
+
+For additional help, check the browser console (F12) for detailed error messages.
+
+## 📝 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+**Built with ❤️ for secure government document management**
