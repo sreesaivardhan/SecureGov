@@ -4,7 +4,7 @@ const auth = firebase.auth();
 const db = firebase.firestore(); // Keep for user management, but documents will use MongoDB
 
 // Backend API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5000';
 
 // Global Variables
 let currentUser = null;
@@ -52,7 +52,13 @@ const logger = {
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         currentUser = user;
-        logger.info('User authenticated', { uid: user.uid });
+        // Initialize dashboard when authenticated
+        if (currentUser) {
+            updateAllDashboardCounts();
+            loadUserProfile();
+            startDashboardRefresh(); // Start auto-refresh
+            logger.info('User authenticated', { uid: currentUser.uid });
+        }
         
         // Store Firebase token for API calls
         const token = await user.getIdToken();
@@ -384,6 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const inviteEmail = document.getElementById('inviteEmail').value.trim();
             const relationship = document.getElementById('memberRelationship').value;
+            const memberName = document.getElementById('memberName') ? document.getElementById('memberName').value.trim() : '';
             
             if (!inviteEmail || !relationship) {
                 showAlert('Please fill in all fields', 'error');
@@ -396,8 +403,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitButton.textContent = 'Sending...';
             }
 
-            // Family invitation functionality will be implemented later
-            showAlert('Family features are being redesigned. Please check back later.', 'info');
+            try {
+                // Validate email format
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(inviteEmail)) {
+                    showAlert('Please enter a valid email address', 'error');
+                    return;
+                }
+
+                if (inviteEmail === currentUser.email) {
+                    showAlert('You cannot invite yourself', 'error');
+                    return;
+                }
+
+                // Send invitation to backend
+                const response = await fetch(`${API_BASE_URL}/api/family/invite`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${await currentUser.getIdToken()}`
+                    },
+                    body: JSON.stringify({
+                        email: inviteEmail,
+                        relationship: relationship,
+                        memberName: memberName
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Family invitation sent successfully!', 'success');
+                    document.getElementById('inviteFamilyForm').reset();
+                    hideModal('inviteFamilyModal');
+                    
+                    // Refresh family data if on family page
+                    if (window.familyManager) {
+                        await window.familyManager.loadFamilyGroups();
+                    }
+                } else {
+                    showAlert(result.message || 'Failed to send invitation', 'error');
+                }
+            } catch (error) {
+                console.error('Family invitation error:', error);
+                showAlert('Failed to send invitation. Please try again.', 'error');
+            }
             
             // Re-enable submit button
             if (submitButton) {
@@ -516,7 +566,7 @@ async function loadDocuments() {
         documentsGrid.innerHTML = '<div style="text-align: center; padding: 20px;">Loading documents...</div>';
         
         const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
-        const response = await fetch(`${API_BASE_URL}/documents`, {
+        const response = await fetch(`${API_BASE_URL}/api/documents`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -582,12 +632,16 @@ function setupEventListeners() {
     // Upload form handler
     const uploadForm = document.getElementById('uploadForm');
     if (uploadForm) {
+        // Remove existing listeners first
+        uploadForm.removeEventListener('submit', handleDocumentUpload);
         uploadForm.addEventListener('submit', handleDocumentUpload);
     }
     
     // Family invitation form handler
     const inviteFamilyForm = document.getElementById('inviteFamilyForm');
     if (inviteFamilyForm) {
+        // Remove existing listeners first to prevent duplicates
+        inviteFamilyForm.removeEventListener('submit', handleFamilyInvitation);
         inviteFamilyForm.addEventListener('submit', handleFamilyInvitation);
     }
 }
@@ -598,7 +652,9 @@ async function loadFamilyMembers() {
         const token = currentUser ? await currentUser.getIdToken() : null;
         if (!token) return;
         
-        const response = await fetch(`${API_BASE_URL}/family/members`, {
+        // Remove cleanup call - handled by backend deduplication
+        
+        const response = await fetch(`${API_BASE_URL}/api/family/members`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -625,7 +681,7 @@ async function loadFamilyMembersCount() {
         const token = currentUser ? await currentUser.getIdToken() : null;
         if (!token) return;
         
-        const response = await fetch(`${API_BASE_URL}/family/count`, {
+        const response = await fetch(`${API_BASE_URL}/api/family/count`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -648,34 +704,86 @@ function displayFamilyMembers(members) {
     const container = document.getElementById('familyMembersList');
     if (!container) return;
     
-    if (members.length === 0) {
-        container.innerHTML = `
+    // Separate active members and pending invitations
+    const activeMembers = members.filter(member => member.status === 'active');
+    const pendingInvitations = members.filter(member => member.status === 'pending' || member.isPending);
+    
+    let html = '';
+    
+    // Show pending invitations section first
+    if (pendingInvitations.length > 0) {
+        html += `
+            <div class="pending-invitations-section">
+                <h3><i class="fas fa-clock"></i> Pending Invitations</h3>
+                <p class="section-description">These people have been invited but haven't accepted yet</p>
+                <div class="pending-invitations-list">
+                    ${pendingInvitations.map(invitation => `
+                        <div class="pending-invitation-card">
+                            <div class="invitation-info">
+                                <h4>${invitation.memberName || invitation.name || invitation.email}</h4>
+                                <span class="invitation-relationship">${invitation.relationship || 'Family Member'}</span>
+                                <p class="invitation-email">${invitation.memberEmail || invitation.email}</p>
+                                <span class="invitation-status">
+                                    <i class="fas fa-clock"></i> Invitation Sent
+                                </span>
+                            </div>
+                            <div class="invitation-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="resendInvitation('${invitation._id}')">
+                                    <i class="fas fa-redo"></i> Resend
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="cancelInvitation('${invitation.invitationToken || invitation._id}')">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Show active members section
+    if (activeMembers.length === 0 && pendingInvitations.length === 0) {
+        html += `
             <div class="empty-state">
                 <i class="fas fa-users" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
                 <h3>No Family Members Yet</h3>
                 <p>Start by inviting family members to share documents securely.</p>
             </div>
         `;
-        return;
+    } else if (activeMembers.length > 0) {
+        html += `
+            <div class="active-members-section">
+                <h3><i class="fas fa-users"></i> Family Members</h3>
+                <div class="family-members-list">
+                    ${activeMembers.map(member => `
+                        <div class="family-member-card">
+                            <div class="member-info">
+                                <h4>${member.memberName || member.name || member.email}</h4>
+                                <span class="member-relationship">
+                                    <i class="fas fa-heart"></i> ${member.relationship || 'Family Member'}
+                                </span>
+                                <p class="member-email">${member.memberEmail || member.email}</p>
+                                <span class="member-status status-active">
+                                    <i class="fas fa-check-circle"></i> Active
+                                </span>
+                            </div>
+                            <div class="member-actions">
+                                <button class="btn btn-sm btn-primary" onclick="editMemberRelationship('${member._id}', '${member.relationship || ''}')">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="removeFamilyMember('${member._id}')">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
     
-    container.innerHTML = members.map(member => `
-        <div class="family-member-card">
-            <div class="member-info">
-                <h4>${member.name || member.email}</h4>
-                <span class="member-relationship">${member.relationship}</span>
-                <p class="member-email">${member.email}</p>
-                <span class="member-status status-${member.status}">${member.status}</span>
-            </div>
-            <div class="member-actions">
-                ${member.status === 'active' ? `
-                    <button class="btn btn-sm btn-danger" onclick="removeFamilyMember('${member._id}')">
-                        <i class="fas fa-trash"></i> Remove
-                    </button>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
+    container.innerHTML = html;
 }
 
 function displayPendingInvitations(invitations) {
@@ -825,37 +933,156 @@ function hideInviteModal() {
 async function handleFamilyInvitation(event) {
     event.preventDefault();
     
+    // Prevent double submission
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    if (submitButton.disabled) {
+        return; // Already processing
+    }
+    submitButton.disabled = true;
+    submitButton.textContent = 'Sending...';
+    
     const email = document.getElementById('inviteEmail').value;
     const relationship = document.getElementById('memberRelationship').value;
+    const memberName = document.getElementById('inviteMemberName').value;
     
-    if (!email || !relationship) {
+    if (!email || !relationship || !memberName) {
         showAlert('Please fill in all fields', 'error');
+        submitButton.disabled = false;
+        submitButton.textContent = 'Send Invitation';
         return;
     }
     
     try {
         const token = await currentUser.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/family/invite`, {
+        const response = await fetch(`${API_BASE_URL}/api/family/invite`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email, relationship })
+            body: JSON.stringify({ email, relationship, memberName })
         });
         
         const data = await response.json();
         
         if (response.ok && data.success) {
-            hideInviteModal();
-            loadFamilyMembers(); // Refresh the list
-            loadFamilyMembersCount(); // Update dashboard count
+            showAlert('Family invitation sent successfully!', 'success');
+            await loadFamilyMembers(); // Refresh the list
+            await loadFamilyMembersCount(); // Update dashboard count
+            
+            // Hide modal
+            const modalElement = document.getElementById('inviteFamilyModal');
+            if (modalElement) {
+                modalElement.style.display = 'none';
+                modalElement.classList.remove('show');
+                document.body.classList.remove('modal-open');
+                // Remove backdrop
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+            }
+            
+            // Reset form
+            document.getElementById('inviteFamilyForm').reset();
         } else {
+            console.error('Invitation failed:', data);
             showAlert(data.message || 'Failed to send invitation', 'error');
         }
     } catch (error) {
         console.error('Error sending invitation:', error);
+        console.error('Full error details:', error);
         showAlert('Failed to send invitation. Please try again.', 'error');
+    } finally {
+        // Re-enable submit button
+        submitButton.disabled = false;
+        submitButton.textContent = 'Send Invitation';
+    }
+}
+
+// Edit member relationship function
+async function editMemberRelationship(memberId, currentRelationship) {
+    const newRelationship = prompt('Enter new relationship:', currentRelationship);
+    if (!newRelationship || newRelationship === currentRelationship) {
+        return;
+    }
+    
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/api/family/members/${memberId}/relationship`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ relationship: newRelationship })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showAlert('Relationship updated successfully', 'success');
+            loadFamilyMembers(); // Refresh the list
+        } else {
+            showAlert(data.message || 'Failed to update relationship', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating relationship:', error);
+        showAlert('Failed to update relationship. Please try again.', 'error');
+    }
+}
+
+// Resend invitation function
+async function resendInvitation(invitationId) {
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/api/family/invitations/${invitationId}/resend`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showAlert('Invitation resent successfully', 'success');
+        } else {
+            showAlert(data.message || 'Failed to resend invitation', 'error');
+        }
+    } catch (error) {
+        console.error('Error resending invitation:', error);
+        showAlert('Failed to resend invitation. Please try again.', 'error');
+    }
+}
+
+// Cancel invitation function
+async function cancelInvitation(invitationId) {
+    if (!confirm('Are you sure you want to cancel this invitation?')) {
+        return;
+    }
+    
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/api/family/invitations/${invitationId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showAlert('Invitation cancelled successfully', 'success');
+            await loadFamilyMembers(); // Refresh the list
+            await loadFamilyMembersCount(); // Update dashboard count
+        } else {
+            showAlert(data.message || 'Failed to cancel invitation', 'error');
+        }
+    } catch (error) {
+        console.error('Error cancelling invitation:', error);
+        showAlert('Failed to cancel invitation. Please try again.', 'error');
     }
 }
 
@@ -866,7 +1093,7 @@ async function removeFamilyMember(memberId) {
     
     try {
         const token = await currentUser.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/family/members/${memberId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/family/members/${memberId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -878,8 +1105,8 @@ async function removeFamilyMember(memberId) {
         
         if (response.ok && data.success) {
             showAlert('Family member removed successfully', 'success');
-            loadFamilyMembers(); // Refresh the list
-            loadFamilyMembersCount(); // Update dashboard count
+            await loadFamilyMembers(); // Refresh the list
+            await loadFamilyMembersCount(); // Update dashboard count
         } else {
             showAlert(data.message || 'Failed to remove family member', 'error');
         }
@@ -896,7 +1123,7 @@ async function cancelInvitation(invitationId) {
     
     try {
         const token = await currentUser.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/family/invitations/${invitationId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/family/invitations/${invitationId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -908,7 +1135,8 @@ async function cancelInvitation(invitationId) {
         
         if (response.ok && data.success) {
             showAlert('Invitation cancelled successfully', 'success');
-            loadFamilyMembers(); // Refresh the list
+            await loadFamilyMembers(); // Refresh the list
+            await loadFamilyMembersCount(); // Update dashboard count
         } else {
             showAlert(data.message || 'Failed to cancel invitation', 'error');
         }
@@ -921,7 +1149,7 @@ async function cancelInvitation(invitationId) {
 async function resendInvitation(invitationId) {
     try {
         const token = await currentUser.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/family/invitations/${invitationId}/resend`, {
+        const response = await fetch(`${API_BASE_URL}/api/family/invitations/${invitationId}/resend`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -966,11 +1194,11 @@ async function handleDocumentUpload(event) {
         const formData = new FormData();
         formData.append('document', fileInput.files[0]);
         formData.append('title', docName.value);
-        formData.append('classification', docType.value);
+        formData.append('category', docType.value);
         formData.append('description', docDescription.value || '');
         
         const token = await currentUser.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+        const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -996,10 +1224,12 @@ async function handleDocumentUpload(event) {
                 `;
             }
             
-            // Refresh documents if on documents section
-            if (document.getElementById('documentsSection').style.display !== 'none') {
-                loadDocuments();
-            }
+            // Refresh documents after upload
+            loadDocuments();
+            updateAllDashboardCounts(); // Update dashboard counts
+            
+            // Switch to documents section to show the uploaded file
+            showDashboardSection('documents');
         } else {
             showAlert(data.message || 'Upload failed', 'error');
         }
@@ -1046,7 +1276,7 @@ async function viewDocument(documentId) {
         const token = await currentUser.getIdToken();
         
         // Get document metadata
-        const response = await fetch(`${API_BASE_URL}/documents`, {
+        const response = await fetch(`${API_BASE_URL}/api/documents`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -1070,7 +1300,7 @@ async function viewDocument(documentId) {
         
         if (docData.mimeType && docData.mimeType.startsWith('image/')) {
             // For images, create authenticated request
-            const imageResponse = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+            const imageResponse = await fetch(`${API_BASE_URL}/api/documents/${documentId}/download`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -1085,7 +1315,7 @@ async function viewDocument(documentId) {
             }
         } else if (docData.mimeType === 'application/pdf') {
             // For PDFs, create authenticated request and blob URL
-            const pdfResponse = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+            const pdfResponse = await fetch(`${API_BASE_URL}/api/documents/${documentId}/download`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -1139,7 +1369,7 @@ async function downloadDocument(documentId) {
         
         const token = await currentUser.getIdToken();
         
-        const response = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+        const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}/download`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -1187,7 +1417,7 @@ async function deleteDocument(docId) {
     try {
         const token = currentUser ? await currentUser.getIdToken() : localStorage.getItem('firebaseToken');
         
-        const response = await fetch(`${API_BASE_URL}/documents/${docId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/documents/${docId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -1199,6 +1429,7 @@ async function deleteDocument(docId) {
         if (data.success) {
             showAlert('Document deleted successfully', 'success');
             loadDocuments(); // Refresh the document list
+            updateAllDashboardCounts(); // Update dashboard counts
         } else {
             showAlert(data.message || 'Failed to delete document', 'error');
         }

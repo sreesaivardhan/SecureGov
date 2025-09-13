@@ -2,11 +2,11 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "server",
   "version": "1.0.0",
-  "main": "server-clean.js",
+  "main": "server-simple.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server-clean.js",
-    "dev": "nodemon server-clean.js",
+    "start": "node server-simple.js",
+    "dev": "nodemon server-simple.js",
     "build": "npm install --legacy-peer-deps"
   },
   "keywords": [],

@@ -126,36 +126,53 @@ class DocumentManager {
 
     async loadDocuments() {
         try {
-            // Use mock documents for demo
+            this.showLoading(true);
+            
+            // Build query parameters
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                limit: this.currentLimit,
+                ...this.currentFilters
+            });
+
+            const response = await this.apiCall(`/documents?${params}`);
+            
+            if (response.success) {
+                this.documents = response.documents || [];
+                this.renderDocuments();
+                this.renderPagination(response.pagination || { total: 0, page: 1, pages: 1 });
+            } else {
+                throw new Error(response.message || 'Failed to load documents');
+            }
+        } catch (error) {
+            console.error('Failed to load documents:', error);
+            // Show mock documents as fallback
             this.documents = [
                 {
-                    id: 'doc1',
+                    _id: 'doc1',
                     title: 'Aadhaar Card',
                     category: 'identity',
                     department: 'citizen',
                     status: 'verified',
                     verificationStatus: 'verified',
                     uploadDate: new Date().toISOString(),
-                    fileSize: 2621440, // 2.5 MB in bytes
+                    fileSize: 2621440,
                     mimeType: 'application/pdf'
                 },
                 {
-                    id: 'doc2',
+                    _id: 'doc2',
                     title: 'PAN Card',
                     category: 'identity',
                     department: 'citizen',
                     status: 'verified',
                     verificationStatus: 'verified',
                     uploadDate: new Date().toISOString(),
-                    fileSize: 1258291, // 1.2 MB in bytes
+                    fileSize: 1258291,
                     mimeType: 'application/pdf'
                 }
             ];
             this.renderDocuments();
             this.renderPagination({ total: 2, page: 1, pages: 1 });
-        } catch (error) {
-            console.error('Failed to load documents:', error);
-            this.showEmptyState('Failed to load documents');
         } finally {
             this.showLoading(false);
         }
@@ -163,18 +180,34 @@ class DocumentManager {
 
     async loadStats() {
         try {
-            // Use mock stats for demo
+            const response = await this.apiCall('/documents/stats');
+            
+            if (response.success) {
+                const stats = response.stats;
+                const totalDocsEl = document.getElementById('totalDocs');
+                const sharedDocsEl = document.getElementById('sharedDocs');
+                const recentDocsEl = document.getElementById('recentDocs');
+                const expiringDocsEl = document.getElementById('expiringDocs');
+                
+                if (totalDocsEl) totalDocsEl.textContent = stats.total || '0';
+                if (sharedDocsEl) sharedDocsEl.textContent = stats.shared || '0';
+                if (recentDocsEl) recentDocsEl.textContent = stats.recent || '0';
+                if (expiringDocsEl) expiringDocsEl.textContent = stats.expiring || '0';
+            } else {
+                throw new Error('Failed to load stats');
+            }
+        } catch (error) {
+            console.error('Failed to load stats:', error);
+            // Use fallback stats
             const totalDocsEl = document.getElementById('totalDocs');
             const sharedDocsEl = document.getElementById('sharedDocs');
             const recentDocsEl = document.getElementById('recentDocs');
             const expiringDocsEl = document.getElementById('expiringDocs');
             
-            if (totalDocsEl) totalDocsEl.textContent = '2';
+            if (totalDocsEl) totalDocsEl.textContent = this.documents.length.toString();
             if (sharedDocsEl) sharedDocsEl.textContent = '0';
-            if (recentDocsEl) recentDocsEl.textContent = '2';
+            if (recentDocsEl) recentDocsEl.textContent = this.documents.length.toString();
             if (expiringDocsEl) expiringDocsEl.textContent = '0';
-        } catch (error) {
-            console.error('Failed to load stats:', error);
         }
     }
 

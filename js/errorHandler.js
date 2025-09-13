@@ -88,26 +88,11 @@ class FrontendErrorHandler {
         }
     }
 
-    // Send error to server
+    // Send error to server - disabled to prevent 405 errors
     async sendErrorToServer(errorEntry) {
-        try {
-            const user = firebase.auth().currentUser;
-            if (!user) return;
-
-            const token = await user.getIdToken();
-            
-            await fetch('/api/errors/client', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(errorEntry)
-            });
-        } catch (error) {
-            // Silently fail - don't create error loops
-            console.warn('Failed to send error to server:', error);
-        }
+        // Temporarily disabled to prevent 405 errors from non-existent endpoint
+        // TODO: Implement proper error logging endpoint if needed
+        console.log('Error logged locally:', errorEntry.type, errorEntry.details);
     }
 
     // Check if error is critical
