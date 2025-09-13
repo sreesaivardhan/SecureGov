@@ -904,12 +904,20 @@ app.delete('/api/family/invitations/:invitationId', verifyToken, async (req, res
     const db = client.db('secureGovDocs');
     
     // Delete ALL matching invitations (handles duplicates)
-    const result = await db.collection('family_invitations').deleteMany({
-      $or: [
-        { token: invitationId, invitedBy: req.user.uid },
-        { _id: new ObjectId(invitationId), invitedBy: req.user.uid }
-      ]
-    });
+    let result;
+    try {
+      // Try as ObjectId first
+      result = await db.collection('family_invitations').deleteMany({
+        _id: new ObjectId(invitationId),
+        invitedBy: req.user.uid
+      });
+    } catch (objectIdError) {
+      // If ObjectId fails, try as token string
+      result = await db.collection('family_invitations').deleteMany({
+        token: invitationId,
+        invitedBy: req.user.uid
+      });
+    }
     
     await client.close();
     
@@ -927,6 +935,8 @@ app.delete('/api/family/invitations/:invitationId', verifyToken, async (req, res
     }
   } catch (error) {
     console.error('❌ Cancel invitation error:', error);
+    console.error('Invitation ID that caused error:', invitationId);
+    console.error('Full error details:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel invitation'

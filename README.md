@@ -16,9 +16,12 @@ A comprehensive, secure platform for managing government documents with advanced
 ### 👨‍👩‍👧‍👦 Family Management
 - **Family Groups**: Create and manage family groups for secure document sharing
 - **Email Invitations**: Send secure email-based invitations with token authentication
+- **Custom Member Names**: Enter full names for family members instead of auto-extracting from emails
 - **Relationship Management**: Define and edit family relationships (Parent, Spouse, Child, etc.)
-- **Invitation Tracking**: Monitor pending, accepted, and rejected invitations
+- **Invitation Tracking**: Monitor pending, accepted, and rejected invitations with real-time updates
 - **Member Management**: Add, remove, and manage family members with proper permissions
+- **Duplicate Prevention**: Advanced backend validation prevents duplicate invitations and members
+- **Single-Click Operations**: Optimized UI for single-click invitation management
 
 ### 🔐 Security & Authentication
 - **Firebase Authentication**: Secure user registration and login with email/password
@@ -33,6 +36,9 @@ A comprehensive, secure platform for managing government documents with advanced
 - **Responsive Design**: Mobile-first design that works on all devices
 - **Performance Optimization**: Efficient data loading and caching strategies
 - **Cross-browser Compatibility**: Works on all modern browsers
+- **Enhanced Form Protection**: Button disable mechanisms prevent double submissions
+- **Advanced Database Operations**: MongoDB operations with duplicate handling and cleanup
+- **Robust Error Recovery**: Graceful handling of ObjectId and token format mismatches
 
 ## 🛠️ Tech Stack
 
@@ -250,15 +256,22 @@ Available on:
 **Send Invitations:**
 1. Click "Family" in navigation
 2. Click "Invite Family Member"
-3. Enter email address and relationship
-4. Click "Send Invitation"
-5. ✅ Invitation should appear in pending list
+3. Enter member name, email address, and relationship
+4. Click "Send Invitation" (button will disable during processing)
+5. ✅ Invitation should appear in pending list with custom member name
 
 **Manage Family Members:**
-1. View family members list
+1. View family members list with proper names displayed
 2. Edit relationships using edit button
-3. Remove members using delete button
-4. ✅ Changes should be reflected immediately
+3. Remove members using delete button (single-click removal)
+4. Cancel pending invitations with cancel button
+5. ✅ Changes should be reflected immediately with real-time updates
+
+**Duplicate Prevention Testing:**
+1. Try sending invitation to same email twice
+2. ✅ Should prevent duplicate invitations with proper error message
+3. Try inviting yourself
+4. ✅ Should prevent self-invitations with validation error
 
 ### 4. Dashboard Testing
 
@@ -375,12 +388,15 @@ securegov-project/
 - `GET /api/documents/stats` - Get document statistics
 
 ### Family Management Endpoints
-- `GET /api/family` - Get family members
-- `POST /api/family/invite` - Send family invitation
-- `GET /api/family/invitations` - Get pending invitations
-- `DELETE /api/family/invitations/:id` - Cancel invitation
+- `GET /api/family/members` - Get family members and pending invitations
+- `GET /api/family/count` - Get family member count for dashboard
+- `POST /api/family/invite` - Send family invitation with custom member name
+- `DELETE /api/family/invitations/:id` - Cancel invitation (supports ObjectId and token)
+- `DELETE /api/family/members/:id` - Remove family member (handles duplicates)
 - `POST /api/family/invitations/:id/resend` - Resend invitation
 - `PUT /api/family/members/:id/relationship` - Update member relationship
+- `POST /api/family/accept/:token` - Accept invitation via secure token
+- `POST /api/family/reject-invitation/:token` - Reject invitation
 
 ## 🔍 Troubleshooting
 
@@ -428,6 +444,22 @@ echo $MONGODB_URI
 1. Download service account key from Firebase Console
 2. Place `serviceAccountKey.json` in `server/` directory
 3. Restart backend server
+
+#### 6. "Duplicate Invitation" or "500 Error on Deletion"
+**Problem:** Database contains duplicate records or ObjectId format issues
+**Solution:**
+1. Check server logs for detailed error messages
+2. Restart backend server to clear any cached connections
+3. Use MongoDB Compass to manually check for duplicate records
+4. Backend automatically handles ObjectId vs string ID formats
+
+#### 7. "Family Member Name Shows as Undefined"
+**Problem:** Member name not being passed correctly in invitation form
+**Solution:**
+1. Ensure all form fields (memberName, email, relationship) are filled
+2. Check browser console for JavaScript errors
+3. Verify backend is receiving memberName field in request
+4. Clear browser cache and reload page
 
 ### Debug Mode
 
