@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 5000;
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────
 app.use(corsMiddleware);
-app.options('*', require('cors')(corsOptions));
+app.options('/{*splat}', require('cors')(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
