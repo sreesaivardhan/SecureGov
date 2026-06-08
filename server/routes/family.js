@@ -380,4 +380,42 @@ router.delete('/groups/:groupId/members/:memberUid', verifyToken, async (req, re
   return res.json({ success: true, message: 'Member removed from group.' });
 });
 
+// ─── DELETE /api/family/groups/:groupId ──────────────────────────────────────
+// Soft-deletes a group. Only the group creator/sole-admin can do this.
+// Blocked if the group has other members (to avoid orphaning shared docs).
+
+router.delete('/groups/:groupId', verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const { uid }     = req.user;
+
+  if (!mongoose.Types.ObjectId.isValid(groupId)) {
+    return res.status(400).json({ success: false, message: 'Invalid group ID.' });
+  }
+
+  const group = await FamilyGroup.findOne({ _id: groupId, status: 'active' });
+  if (!group) {
+    return res.status(404).json({ success: false, message: 'Group not found.' });
+  }
+
+  // Only admins can delete
+  const caller = group.members.find((m) => m.uid === uid);
+  if (!caller || caller.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Only group admins can delete this group.' });
+  }
+
+  // Block if other members are still in the group
+  const otherMembers = group.members.filter((m) => m.uid !== uid);
+  if (otherMembers.length > 0) {
+    return res.status(409).json({
+      success: false,
+      message: `Remove all ${otherMembers.length} member${otherMembers.length !== 1 ? 's' : ''} before deleting this group.`,
+    });
+  }
+
+  group.status = 'archived';
+  await group.save();
+
+  return res.json({ success: true, message: `Group "${group.name}" has been deleted.` });
+});
+
 module.exports = router;

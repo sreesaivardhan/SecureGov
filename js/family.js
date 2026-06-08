@@ -18,10 +18,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setUserDisplay(user, null);
   }
 
+  // Wire up confirm modal buttons (uses _resolveConfirm from utils.js)
+  document.getElementById('confirmModalOkBtn')    .addEventListener('click', () => _resolveConfirm(true));
+  document.getElementById('confirmModalCancelBtn').addEventListener('click', () => _resolveConfirm(false));
+  document.getElementById('confirmModalClose')    .addEventListener('click', () => _resolveConfirm(false));
+
   // Create group
-  document.getElementById('createGroupBtn').addEventListener('click', () => {
-    openModal('createGroupModal');
-  });
+  document.getElementById('createGroupBtn').addEventListener('click', () => openModal('createGroupModal'));
   document.getElementById('createGroupForm').addEventListener('submit', handleCreateGroup);
 
   // Invite member
@@ -35,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadGroups() {
   const container = document.getElementById('groupsList');
   try {
-    const res = await apiFetch('/api/family/groups');
+    const res    = await apiFetch('/api/family/groups');
     const groups = res.groups || [];
 
     if (groups.length === 0) {
@@ -113,6 +116,11 @@ function renderGroup(group) {
             ? `<button class="btn btn-primary btn-sm"
                        onclick="openInviteModal('${group.id}')">
                  <i class="fas fa-user-plus"></i> Invite
+               </button>
+               <button class="btn btn-ghost btn-sm btn-icon text-danger"
+                       title="Delete group"
+                       onclick="deleteGroup('${group.id}','${escapeHtml(group.name)}')">
+                 <i class="fas fa-trash"></i>
                </button>`
             : ''}
         </div>
@@ -130,7 +138,7 @@ function renderGroup(group) {
 async function loadInvitations() {
   const container = document.getElementById('invitationsList');
   try {
-    const res = await apiFetch('/api/family/invitations');
+    const res         = await apiFetch('/api/family/invitations');
     const invitations = res.invitations || [];
 
     const received = invitations.filter(i => i.direction === 'received' && i.status === 'pending');
@@ -155,12 +163,10 @@ async function loadInvitations() {
     }
 
     let html = '';
-
     if (received.length > 0) {
       html += `<div class="section-title mb-4" style="margin-top:0;">Received</div>`;
       html += received.map(renderReceivedInvite).join('');
     }
-
     if (sent.length > 0) {
       html += `<div class="section-title mb-4" style="margin-top:${received.length ? '24px' : '0'};">Sent</div>`;
       html += sent.map(renderSentInvite).join('');
@@ -249,6 +255,26 @@ async function handleCreateGroup(e) {
   }
 }
 
+/* ── Delete Group ───────────────────────────────────────────── */
+
+async function deleteGroup(groupId, name) {
+  const confirmed = await confirmAction(
+    'Delete Group',
+    `Delete "${name}"? This cannot be undone. Remove all members first if you have any.`,
+    'Delete Group',
+    true
+  );
+  if (!confirmed) return;
+
+  try {
+    const res = await apiFetch(`/api/family/groups/${groupId}`, { method: 'DELETE' });
+    showToast(res.message || `Group "${name}" deleted`, 'success');
+    await loadGroups();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 /* ── Invite Member ──────────────────────────────────────────── */
 
 function openInviteModal(groupId) {
@@ -273,17 +299,23 @@ async function handleInvite(e) {
       method: 'POST',
       body: JSON.stringify({ email, groupId: inviteGroupId, role }),
     });
-    showToast(res.message || `Invitation sent to ${email}`, 'success');
+
+    // Reset button and close modal BEFORE any async work
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Invitation';
     closeModal('inviteModal');
+
+    showToast(res.message || `Invitation sent to ${email}`, 'success');
 
     // If email not configured, show the token for testing
     if (res.invitation && res.invitation.emailSent === false) {
-      showToast(`Dev: token = ${res.invitation.token.slice(0, 16)}…  (check server console for link)`, 'info');
+      showToast(`Dev: check server console for invitation link`, 'info');
     }
-    await loadInvitations();
+
+    // Reload in background — don't await so UI isn't blocked
+    loadInvitations();
   } catch (err) {
     showToast(err.message, 'error');
-  } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Invitation';
   }
@@ -314,7 +346,14 @@ async function rejectInvite(token) {
 /* ── Remove Member ──────────────────────────────────────────── */
 
 async function removeMember(groupId, memberUid, name) {
-  if (!confirm(`Remove ${name} from this group?`)) return;
+  const confirmed = await confirmAction(
+    'Remove Member',
+    `Remove ${name} from this group? They will lose access to any documents shared with the group.`,
+    'Remove',
+    true
+  );
+  if (!confirmed) return;
+
   try {
     await apiFetch(`/api/family/groups/${groupId}/members/${memberUid}`, { method: 'DELETE' });
     showToast(`${name} removed from group`, 'success');

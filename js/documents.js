@@ -296,7 +296,14 @@ async function downloadDoc(id, title) {
 /* ── Delete ─────────────────────────────────────────────────── */
 
 async function deleteDoc(id, title) {
-  if (!confirm(`Delete "${title}"?\n\nThis cannot be undone.`)) return;
+  const confirmed = await confirmAction(
+    'Delete Document',
+    `Delete "${title}"? This cannot be undone.`,
+    'Delete',
+    true
+  );
+  if (!confirmed) return;
+
   try {
     await apiFetch(`/api/documents/${id}`, { method: 'DELETE' });
     showToast('Document deleted', 'success');
@@ -391,7 +398,14 @@ async function shareWith(targetUid, email) {
 }
 
 async function revokeShare(docId, targetUid, email) {
-  if (!confirm(`Revoke access for ${email}?`)) return;
+  const confirmed = await confirmAction(
+    'Revoke Access',
+    `Remove access for ${email}? They will no longer be able to view this document.`,
+    'Revoke',
+    true
+  );
+  if (!confirmed) return;
+
   try {
     await apiFetch(`/api/documents/${docId}/share/${targetUid}`, { method: 'DELETE' });
     showToast(`Access revoked for ${email}`, 'success');

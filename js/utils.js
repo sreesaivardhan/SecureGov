@@ -182,8 +182,58 @@ function closeModal(id) {
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('open');
+    // If the confirm modal was closed via backdrop, resolve false
+    if (e.target.id === 'confirmModal' && typeof _confirmResolve === 'function') {
+      _confirmResolve(false);
+      _confirmResolve = null;
+    }
   }
 });
+
+/* ── In-app confirmation modal ───────────────────────────────── */
+
+// Internal state — one confirm at a time
+let _confirmResolve = null;
+
+/**
+ * Show a styled in-app confirmation modal.
+ * Returns Promise<boolean> — true if confirmed, false if cancelled.
+ *
+ * Requires #confirmModal markup to be present on the page.
+ * @param {string} title
+ * @param {string} message
+ * @param {string} [confirmLabel='Confirm']
+ * @param {boolean} [isDanger=true]
+ */
+function confirmAction(title, message, confirmLabel = 'Confirm', isDanger = true) {
+  const titleEl = document.getElementById('confirmModalTitle');
+  const msgEl   = document.getElementById('confirmModalMessage');
+  const okBtn   = document.getElementById('confirmModalOkBtn');
+
+  if (!titleEl || !msgEl || !okBtn) {
+    // Fallback if markup missing — should not happen in production
+    return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  }
+
+  titleEl.textContent  = title;
+  msgEl.textContent    = message;
+  okBtn.textContent    = confirmLabel;
+  okBtn.className      = `btn ${isDanger ? 'btn-danger' : 'btn-primary'}`;
+
+  openModal('confirmModal');
+
+  return new Promise((resolve) => {
+    _confirmResolve = resolve;
+  });
+}
+
+function _resolveConfirm(result) {
+  closeModal('confirmModal');
+  if (typeof _confirmResolve === 'function') {
+    _confirmResolve(result);
+    _confirmResolve = null;
+  }
+}
 
 /* ── Formatting ──────────────────────────────────────────────── */
 
