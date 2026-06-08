@@ -1,58 +1,75 @@
-const express = require('express');
-const { verifyIdToken } = require('../config/firebase');
-const { getDB, collections } = require('../config/database');
-const { authenticateUser } = require('../middleware/auth');
+'use strict';
 
-const router = express.Router();
+const express    = require('express');
+const router     = express.Router();
+const { verifyToken } = require('../middleware/auth');
+const User       = require('../models/User');
 
-// Test authentication endpoint
-router.get('/verify', authenticateUser, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: 'Authentication verified',
-      user: {
-        uid: req.user.uid,
-        email: req.user.email,
-        name: req.user.name,
-        role: req.user.role || 'user',
-        department: req.user.department || 'citizen'
-      }
-    });
-  } catch (error) {
-    console.error('Auth verify error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Authentication verification failed'
-    });
-  }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Return only the fields we want to expose to the client.
+ * Never leak internal Mongoose fields or future sensitive additions.
+ */
+function toPublic(user) {
+  return {
+    id:         user._id,
+    firebaseUID: user.firebaseUID,
+    email:      user.email,
+    name:       user.name,
+    phone:      user.phone,
+    address:    user.address,
+    createdAt:  user.createdAt,
+    updatedAt:  user.updatedAt,
+  };
+}
+
+// ─── POST /api/auth/sync ──────────────────────────────────────────────────────
+/**
+ * Called by the frontend immediately after Firebase login.
+ * Creates the user in MongoDB if this is their first login,
+ * or updates email / name if they have changed in Firebase.
+ *
+ * Body (optional): { name, phone }
+ */
+router.post('/sync', verifyToken, async (req, res) => {
+  const { uid, email } = req.user;
+  const { name, phone } = req.body;
+
+  // Build the $set payload — only include fields that were sent
+  const fields = { email }; // always keep email in sync with Firebase
+  if (name  && typeof name  === 'string') fields.name  = name.trim();
+  if (phone && typeof phone === 'string') fields.phone = phone.trim();
+
+  const user = await User.findOneAndUpdate(
+    { firebaseUID: uid },
+    {
+      $set:         fields,
+      $setOnInsert: { firebaseUID: uid }, // only written on first-time insert
+    },
+    { upsert: true, new: true, runValidators: true }
+  );
+
+  return res.status(200).json({ success: true, user: toPublic(user) });
 });
 
-// Get current user info
-router.get('/me', authenticateUser, async (req, res) => {
-  try {
-    const db = await getDB();
-    const userDoc = await collections.users().findOne({ 
-      firebaseUID: req.user.uid 
-    });
+// ─── GET /api/auth/me ─────────────────────────────────────────────────────────
+/**
+ * Returns the current user's MongoDB record.
+ * Used on page load to hydrate the UI.
+ * Returns 404 if the user has never synced (edge case — client should sync first).
+ */
+router.get('/me', verifyToken, async (req, res) => {
+  const user = await User.findOne({ firebaseUID: req.user.uid });
 
-    res.json({
-      success: true,
-      user: {
-        uid: req.user.uid,
-        email: req.user.email,
-        name: req.user.name,
-        emailVerified: req.user.emailVerified,
-        ...userDoc // Include additional data from MongoDB
-      }
-    });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({
+  if (!user) {
+    return res.status(404).json({
       success: false,
-      message: 'Failed to get user information'
+      message: 'User record not found. Call POST /api/auth/sync first.',
     });
   }
+
+  return res.json({ success: true, user: toPublic(user) });
 });
 
 module.exports = router;

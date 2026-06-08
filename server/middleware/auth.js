@@ -1,34 +1,52 @@
-const admin = require('firebase-admin');
+'use strict';
 
-// Authentication middleware
-async function authenticateUser(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization;
-    console.log('🔐 Auth header:', authHeader);
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ No valid auth header');
-      return res.status(401).json({ 
-        success: false,
-        message: 'No token provided' 
-      });
-    }
+const { getAdmin } = require('../config/firebase');
 
-    const token = authHeader.split(' ')[1];
-    console.log('🎫 Token received:', token.substring(0, 20) + '...');
-    
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    console.log('✅ Token verified for user:', decodedToken.uid);
-    
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('❌ Token verification failed:', error.message);
-    res.status(401).json({ 
+/**
+ * verifyToken — Express middleware.
+ *
+ * Reads the Bearer token from the Authorization header, verifies it with
+ * Firebase Admin, and attaches a clean req.user object.
+ *
+ * req.user shape:
+ *   { uid, email, emailVerified, name }
+ *
+ * Returns 401 for missing, malformed, expired, or revoked tokens.
+ */
+async function verifyToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
       success: false,
-      message: 'Invalid token' 
+      message: 'Authorization header missing or invalid. Expected: Bearer <token>',
+    });
+  }
+
+  const token = authHeader.slice(7); // strip "Bearer "
+
+  try {
+    const admin        = getAdmin();
+    const decoded      = await admin.auth().verifyIdToken(token);
+
+    req.user = {
+      uid:           decoded.uid,
+      email:         decoded.email        || '',
+      emailVerified: decoded.email_verified || false,
+      name:          decoded.name          || '',
+    };
+
+    return next();
+  } catch (err) {
+    // Log only in dev — don't leak token details to the client
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[auth] Token verification failed:', err.code || err.message);
+    }
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token. Please sign in again.',
     });
   }
 }
 
-module.exports = { authenticateUser };
+module.exports = { verifyToken };

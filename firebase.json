@@ -4,7 +4,8 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "server/**"
     ],
     "rewrites": [
       {
@@ -12,9 +13,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs18"
   }
 }

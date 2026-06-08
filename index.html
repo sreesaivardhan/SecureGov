@@ -1,521 +1,228 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureGov - Digital Document Management</title>
-    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABILAAASCwAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///wAAAAA">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/family-dashboard.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecureGov — Sign In</title>
+  <meta name="description" content="Sign in to SecureGov — secure digital document management for citizens.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    /* ── Auth extras ─────────────────────────────────────────── */
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0;
+      color: var(--text-faint);
+      font-size: 12px;
+    }
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
 
-  
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: var(--font);
+      color: var(--text);
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .btn-google:hover { background: var(--surface-2); border-color: var(--accent); }
+    .btn-google:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    .forgot-link {
+      display: block;
+      text-align: right;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: -4px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .forgot-link:hover { color: var(--accent); opacity: 1; }
+  </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="header">
-        <nav class="nav">
-            <div class="logo">
-                <i class="fas fa-shield-alt"></i>
-                SecureGov
-            </div>
-        </nav>
+
+<div class="auth-page">
+  <!-- Theme toggle -->
+  <div style="position:fixed;top:16px;right:16px;">
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+      <i class="fas fa-sun"></i>
+    </button>
+  </div>
+
+  <!-- ── Login Card ─────────────────────────────────────────── -->
+  <div class="auth-card" id="loginCard">
+    <div class="auth-logo">
+      <i class="fas fa-shield-alt"></i>
+      <span>SecureGov</span>
     </div>
 
-    <div class="container">
-        <!-- Alerts -->
-        <div id="alertContainer"></div>
+    <h1 class="auth-title">Sign in</h1>
+    <p class="auth-subtitle">Access your secure document vault</p>
 
-        <!-- Login Screen -->
-        <div id="loginScreen" class="main-content active">
-            <div class="auth-container">
-                <h2 class="auth-title">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Login to SecureGov
-                </h2>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="loginEmail">Email Address</label>
-                        <input type="email" id="loginEmail" autocomplete="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="loginPassword">Password</label>
-                        <input type="password" id="loginPassword" autocomplete="current-password" required>
-                    </div>
-                    <button type="submit" class="btn">
-                        <span id="loginBtnText">Login</span>
-                        <div id="loginLoader" class="loading hidden"></div>
-                    </button>
-                </form>
-                <div class="auth-switch">
-                    Don't have an account? <a href="#" onclick="showScreen('registerScreen')">Register here</a>
-                </div>
-            </div>
+    <div id="loginError" class="alert alert-danger" style="display:none;"></div>
+
+    <!-- Google -->
+    <button class="btn-google" id="googleLoginBtn" type="button">
+      <!-- Google "G" icon -->
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        <path fill="none" d="M0 0h48v48H0z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="auth-divider">or sign in with email</div>
+
+    <form class="auth-form" id="loginForm" novalidate>
+      <div class="form-group">
+        <label for="loginEmail">Email address</label>
+        <input type="email" id="loginEmail" class="form-control" placeholder="you@example.com"
+               autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <label for="loginPassword">Password</label>
+          <a href="#" class="forgot-link" id="forgotPasswordLink">Forgot password?</a>
         </div>
+        <input type="password" id="loginPassword" class="form-control" placeholder="••••••••"
+               autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-full btn-lg" id="loginBtn">
+        <span id="loginBtnText">Sign In</span>
+        <span id="loginBtnSpinner" style="display:none;"><span class="spinner"></span></span>
+      </button>
+    </form>
 
-        <!-- Register Screen -->
-        <div id="registerScreen" class="main-content">
-            <div class="auth-container">
-                <h2 class="auth-title">
-                    <i class="fas fa-user-plus"></i>
-                    Create Account
-                </h2>
-                <form id="registerForm">
-                    <div class="form-group">
-                        <label for="registerName">Full Name</label>
-                        <input type="text" id="registerName" autocomplete="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="registerEmail">Email Address</label>
-                        <input type="email" id="registerEmail" autocomplete="email" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="registerPhone">Phone Number</label>
-                        <input type="tel" id="registerPhone" autocomplete="tel" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="registerAadhaar">Aadhaar Number</label>
-                        <input type="text" id="registerAadhaar" autocomplete="off" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" autocomplete="new-password" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirmPassword">Confirm Password</label>
-                        <input type="password" id="confirmPassword" autocomplete="new-password" required>
-                    </div>
-                    <button type="submit" class="btn">
-                        <span id="registerBtnText">Create Account</span>
-                        <div id="registerLoader" class="loading hidden"></div>
-                    </button>
-                </form>
-                <div class="auth-switch">
-                    Already have an account? <a href="#" onclick="showScreen('loginScreen')">Login here</a>
-                </div>
-            </div>
-        </div>
+    <p class="auth-switch">
+      Don't have an account?
+      <a href="#" id="showRegister">Create one</a>
+    </p>
+  </div>
 
-        <!-- OTP Verification Screen -->
-        <div id="otpScreen" class="main-content">
-            <div class="auth-container">
-                <h2 class="auth-title">
-                    <i class="fas fa-mobile-alt"></i>
-                    Verify OTP
-                </h2>
-                <p style="text-align: center; margin-bottom: 30px; color: #666;">
-                    Enter the OTP sent to your email/phone
-                </p>
-                <form id="otpForm">
-                    <div class="form-group">
-                        <label for="otpCode">OTP Code</label>
-                        <input type="text" id="otpCode" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" required>
-                    </div>
-                    <button type="submit" class="btn">
-                        <span id="otpBtnText">Verify OTP</span>
-                        <div id="otpLoader" class="loading hidden"></div>
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="resendOTP()">
-                        Resend OTP
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Dashboard Screen -->
-        <div id="dashboardScreen" class="main-content">
-            <div class="dashboard">
-                <div class="sidebar">
-                    <ul class="sidebar-menu">
-                        <li><a href="#" onclick="showDashboardSection('overview')" class="active">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
-                        </a></li>
-                        <li><a href="#" onclick="showDashboardSection('documents')">
-                            <i class="fas fa-file-alt"></i> My Documents
-                        </a></li>
-                        <li><a href="#" onclick="showDashboardSection('upload')">
-                            <i class="fas fa-cloud-upload-alt"></i> Upload Document
-                        </a></li>
-                        <li><a href="#" onclick="showDashboardSection('family')">
-                            <i class="fas fa-users"></i> Family Members
-                        </a></li>
-                        <li><a href="#" onclick="showDashboardSection('profile')">
-                            <i class="fas fa-user-cog"></i> Profile
-                        </a></li>
-                        <li><a href="#" onclick="logout()">
-                            <i class="fas fa-sign-out-alt"></i> Logout
-                        </a></li>
-                    </ul>
-                </div>
-
-                <div class="main-panel">
-                    <!-- Dashboard Overview -->
-                    <div id="overviewSection" class="dashboard-section active">
-                        <div class="welcome-message">
-                            <h2>Welcome to SecureGov Dashboard</h2>
-                            <p>Manage your important government documents securely.</p>
-                        </div>
-                        
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-file-alt"></i>
-                                </div>
-                                <div class="stat-title">Total Documents</div>
-                                <div class="stat-value" id="totalDocs">0</div>
-                                <div class="stat-label">documents</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-share-alt"></i>
-                                </div>
-                                <div class="stat-title">Shared Documents</div>
-                                <div class="stat-value" id="sharedDocs">0</div>
-                                <div class="stat-label">documents</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-users"></i>
-                                </div>
-                                <div class="stat-title">Family Members</div>
-                                <div class="stat-value" id="familyCount">0</div>
-                                <div class="stat-label">members</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-icon">
-                                    <i class="fas fa-envelope"></i>
-                                </div>
-                                <div class="stat-title">Pending Invitations</div>
-                                <div class="stat-value" id="pendingInvitations">0</div>
-                                <div class="stat-label">invitations</div>
-                            </div>
-                        </div>
-                        
-                    </div>
-
-                    <!-- Documents Section -->
-                    <div id="documentsSection" class="dashboard-section" style="display: none;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2>My Documents</h2>
-                            <button class="btn" style="width: auto; padding: 10px 20px;" onclick="showDashboardSection('upload')">
-                                <i class="fas fa-plus"></i> Add Document
-                            </button>
-                        </div>
-                        
-                        <!-- Search and Filter Bar -->
-                        <div class="search-filter-bar">
-                            <div class="search-box">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="documentSearch" placeholder="Search documents..." onkeyup="searchDocuments()">
-                            </div>
-                            <div class="filter-options">
-                                <select id="categoryFilter" onchange="filterDocuments()">
-                                    <option value="">All Categories</option>
-                                    <option value="government">Government</option>
-                                    <option value="personal">Personal</option>
-                                    <option value="financial">Financial</option>
-                                    <option value="medical">Medical</option>
-                                    <option value="legal">Legal</option>
-                                </select>
-                                <select id="dateFilter" onchange="filterDocuments()">
-                                    <option value="">All Dates</option>
-                                    <option value="today">Today</option>
-                                    <option value="week">This Week</option>
-                                    <option value="month">This Month</option>
-                                    <option value="year">This Year</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div id="documentsGrid" class="document-grid">
-                            <!-- Documents will be populated here -->
-                        </div>
-                    </div>
-
-                    <!-- Upload Section -->
-                    <div id="uploadSection" class="dashboard-section" style="display: none;">
-                        <h2>Upload New Document</h2>
-                        <form id="uploadForm">
-                            <div class="upload-area" onclick="triggerFileInput()">
-                                <div class="upload-icon">
-                                    <i class="fas fa-cloud-upload-alt"></i>
-                                </div>
-                                <h3>Click to upload or drag and drop</h3>
-                                <p>PDF, JPG, PNG files only (Max 10MB)</p>
-                            </div>
-                            <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;" onchange="handleFileSelect(event)">
-                            <div class="form-group">
-                                <label for="docType">Document Type</label>
-                                <select id="docType" autocomplete="off" required>
-                                    <option value="">Select Document Type</option>
-                                    <option value="aadhaar">Aadhaar Card</option>
-                                    <option value="pan">PAN Card</option>
-                                    <option value="passport">Passport</option>
-                                    <option value="license">Driving License</option>
-                                    <option value="marksheet">Mark Sheet</option>
-                                    <option value="certificate">Certificate</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="docName">Document Name</label>
-                                <input type="text" id="docName" placeholder="e.g., My Aadhaar Card" autocomplete="off" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="docDescription">Description (Optional)</label>
-                                <input type="text" id="docDescription" placeholder="Additional details about the document" autocomplete="off">
-                            </div>
-                            <button type="submit" class="btn">
-                                <span id="uploadBtnText">Upload Document</span>
-                                <div id="uploadLoader" class="loading hidden"></div>
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Shared Documents Section (Hidden by default) -->
-                    <div id="sharedSection" class="dashboard-section" style="display: none;">
-                        <h2>Shared Documents</h2>
-                        <div id="sharedGrid" class="document-grid">
-                            <p>Use the dedicated Documents page to view shared documents.</p>
-                        </div>
-                    </div>
-
-                    <!-- Family Section -->
-                    <div id="familySection" class="dashboard-section" style="display: none;">
-                        <div class="family-header">
-                            <h2>Family Members</h2>
-                            <button class="btn btn-primary" onclick="showInviteModal()">
-                                <i class="fas fa-plus"></i> Invite Family Member
-                            </button>
-                        </div>
-                        
-                        <div id="familyMembersList" class="family-members-list">
-                            <!-- Family members will be loaded here -->
-                        </div>
-                        
-                        <div id="pendingInvitationsList" class="pending-invitations">
-                            <!-- Pending invitations will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Profile Section -->
-                    <div id="profileSection" class="dashboard-section" style="display: none;">
-                        <h2>My Profile</h2>
-                        <form id="profileForm" class="profile-form" onsubmit="event.preventDefault(); saveUserProfile();">
-                            <div class="form-group">
-                                <label for="profileName">Full Name</label>
-                                <input type="text" id="profileName" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="profileEmail">Email</label>
-                                <input type="email" id="profileEmail" readonly>
-                            </div>
-                            <div class="form-group">
-                                <label for="profilePhone">Phone Number</label>
-                                <input type="tel" id="profilePhone">
-                            </div>
-                            <div class="form-group">
-                                <label for="profileAddress">Address</label>
-                                <textarea id="profileAddress" rows="3"></textarea>
-                            </div>
-                            <button type="submit" class="btn">Update Profile</button>
-                        </form>
-                    </div>
-
-                </div>
-            </div>
-        </div>
+  <!-- ── Register Card ──────────────────────────────────────── -->
+  <div class="auth-card" id="registerCard" style="display:none;">
+    <div class="auth-logo">
+      <i class="fas fa-shield-alt"></i>
+      <span>SecureGov</span>
     </div>
 
-    <!-- Notification Container -->
-    <div id="notificationContainer" class="notification-container"></div>
+    <h1 class="auth-title">Create account</h1>
+    <p class="auth-subtitle">Start securing your important documents</p>
 
-    <!-- Modals -->
-    <!-- Document Viewer Modal -->
-    <div id="documentViewerModal" class="modal">
-        <div class="modal-content document-viewer">
-            <div class="modal-header">
-                <h3 id="documentViewerTitle">Document Viewer</h3>
-                <button class="close-modal" onclick="hideModal('documentViewerModal')">&times;</button>
-            </div>
-            <div class="document-viewer-content">
-                <div class="document-viewer-toolbar">
-                    <button class="btn-secondary" onclick="downloadCurrentDocument()">
-                        <i class="fas fa-download"></i> Download
-                    </button>
-                    <button class="btn-secondary" onclick="hideModal('documentViewerModal')">
-                        <i class="fas fa-times"></i> Close
-                    </button>
-                </div>
-                <div class="document-preview" id="documentPreview">
-                    <!-- Document content will be loaded here -->
-                </div>
-            </div>
-        </div>
+    <div id="registerError" class="alert alert-danger" style="display:none;"></div>
+
+    <!-- Google -->
+    <button class="btn-google" id="googleRegisterBtn" type="button">
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        <path fill="none" d="M0 0h48v48H0z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="auth-divider">or register with email</div>
+
+    <form class="auth-form" id="registerForm" novalidate>
+      <div class="form-group">
+        <label for="regName">Full name</label>
+        <input type="text" id="regName" class="form-control" placeholder="Priya Sharma"
+               autocomplete="name" required>
+      </div>
+      <div class="form-group">
+        <label for="regEmail">Email address</label>
+        <input type="email" id="regEmail" class="form-control" placeholder="you@example.com"
+               autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label for="regPassword">Password</label>
+        <input type="password" id="regPassword" class="form-control" placeholder="At least 6 characters"
+               autocomplete="new-password" required minlength="6">
+      </div>
+      <div class="form-group">
+        <label for="regConfirm">Confirm password</label>
+        <input type="password" id="regConfirm" class="form-control" placeholder="••••••••"
+               autocomplete="new-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-full btn-lg" id="registerBtn">
+        <span id="registerBtnText">Create Account</span>
+        <span id="registerBtnSpinner" style="display:none;"><span class="spinner"></span></span>
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      Already have an account?
+      <a href="#" id="showLogin">Sign in</a>
+    </p>
+  </div>
+
+  <!-- ── Forgot Password Card ───────────────────────────────── -->
+  <div class="auth-card" id="forgotCard" style="display:none;">
+    <div class="auth-logo">
+      <i class="fas fa-shield-alt"></i>
+      <span>SecureGov</span>
     </div>
 
-    <!-- Family Invitation Modal -->
-    <div id="inviteFamilyModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Invite Family Member</h3>
-                <button class="close-modal" onclick="hideInviteModal()">&times;</button>
-            </div>
-            <form id="inviteFamilyForm">
-                <div class="form-group">
-                    <label for="inviteMemberName">Full Name *</label>
-                    <input type="text" id="inviteMemberName" name="memberName" required placeholder="Enter full name">
-                </div>
-                
-                <div class="form-group">
-                    <label for="inviteEmail">Email Address *</label>
-                    <input type="email" id="inviteEmail" name="email" required autocomplete="email">
-                </div>
-                
-                <div class="form-group">
-                    <label for="memberRelationship">Relationship *</label>
-                    <select id="memberRelationship" name="relationship" required>
-                        <option value="">Select relationship</option>
-                        <option value="spouse">Spouse</option>
-                        <option value="parent">Parent</option>
-                        <option value="child">Child</option>
-                        <option value="sibling">Sibling</option>
-                        <option value="grandparent">Grandparent</option>
-                        <option value="grandchild">Grandchild</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="hideInviteModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Send Invitation</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <h1 class="auth-title">Reset password</h1>
+    <p class="auth-subtitle">Enter your email and we'll send a reset link</p>
 
-    <!-- Firebase SDKs -->
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+    <div id="forgotError"   class="alert alert-danger"  style="display:none;"></div>
+    <div id="forgotSuccess" class="alert alert-success" style="display:none;"></div>
 
-<!-- Firebase Configuration -->
-<script>
-// Check if firebase-config.js exists, if not create minimal config
-if (typeof firebase === 'undefined') {
-    console.warn('Firebase not loaded properly');
-}
-</script>
-<script src="js/firebase-config.js" onerror="console.warn('Firebase config file not found')"></script>
+    <form class="auth-form" id="forgotForm" novalidate>
+      <div class="form-group">
+        <label for="forgotEmail">Email address</label>
+        <input type="email" id="forgotEmail" class="form-control" placeholder="you@example.com"
+               autocomplete="email" required>
+      </div>
+      <button type="submit" class="btn btn-primary w-full btn-lg" id="forgotBtn">
+        <span id="forgotBtnText">Send Reset Link</span>
+        <span id="forgotBtnSpinner" style="display:none;"><span class="spinner"></span></span>
+      </button>
+    </form>
 
-    <script src="js/config.js"></script>
-    <script src="js/errorHandler.js"></script>
-    <script src="js/performance.js"></script>
-    <script src="js/dashboard-counts.js"></script>
-    <script src="js/app.js"></script>
-    <script src="js/advanced-features.js"></script>
-</body>
-</html>
+    <p class="auth-switch">
+      <a href="#" id="backToLogin">
+        <i class="fas fa-arrow-left" style="font-size:11px;"></i> Back to Sign In
+      </a>
+    </p>
+  </div>
 
-    <script>
-            // Load dashboard data including family information
-            async function loadDashboardData() {
-                try {
-                    const user = firebase.auth().currentUser;
-                    if (!user) return;
+</div>
 
-                    const token = await user.getIdToken();
-                    
-                    // Load family members and count
-                    const familyResponse = await fetch('http://localhost:5000/api/family/count', {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    if (familyResponse.ok) {
-                        const familyData = await familyResponse.json();
-                        if (familyData.success) {
-                            updateFamilyStats(familyData.count);
-                        }
-                    }
-                    
-                    // Load pending invitations
-                    const invitationsResponse = await fetch('http://localhost:5000/api/family/invitations', {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    if (invitationsResponse.ok) {
-                        const invitationsData = await invitationsResponse.json();
-                        if (invitationsData.success) {
-                            // Filter for pending invitations for current user
-                            const pendingInvitations = invitationsData.invitations.filter(inv => 
-                                inv.email === user.email && inv.status === 'pending'
-                            );
-                            updateInvitationStats(pendingInvitations);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to load dashboard data:', error);
-                }
-            }
-            
-            function updateFamilyStats(memberCount) {
-                const familyCountElement = document.getElementById('familyCount');
-                if (familyCountElement) {
-                    familyCountElement.textContent = memberCount || 0;
-                } else {
-                    console.log('familyCount element not found, skipping stats update');
-                }
-            }
-            
-            function updateInvitationStats(invitations) {
-                const pendingInvitationsElement = document.getElementById('pendingInvitations');
-                if (pendingInvitationsElement) {
-                    pendingInvitationsElement.textContent = invitations.length;
-                } else {
-                    console.log('pendingInvitations element not found, skipping stats update');
-                }
-                
-                // Highlight invitation card if there are pending invitations
-                if (invitations.length > 0) {
-                    const invitationCard = document.querySelector('.stat-card.clickable');
-                    if (invitationCard) {
-                        invitationCard.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-                        invitationCard.style.color = 'white';
-                        const iconElement = invitationCard.querySelector('.stat-icon');
-                        if (iconElement) {
-                            iconElement.style.color = 'white';
-                        }
-                    }
-                }
-            }
-            
-            function displayFamilyGroupsPreview(memberCount) {
-                // This function is no longer needed since we're showing member count instead of groups
-                console.log('Family members count updated:', memberCount);
-            }
-            
-            function getUserRole(group) {
-                const user = firebase.auth().currentUser;
-                if (!user) return 'unknown';
-                
-                const member = group.members?.find(m => m.userId === user.uid && m.status === 'active');
-                return member ? member.role : 'unknown';
-            }
-            
-            // Load dashboard data when user is authenticated
-            firebase.auth().onAuthStateChanged((user) => {
-                if (user && document.getElementById('dashboardScreen').style.display !== 'none') {
-                    loadDashboardData();
-                }
-            });
-        </script>
-    
+<!-- Toast container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+<script src="js/firebase-init.js"></script>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

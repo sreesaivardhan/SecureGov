@@ -1,29 +1,50 @@
-# Dependencies
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
 /node_modules
+server/node_modules
 
-# Environment variables
+# ─── Environment variables ────────────────────────────────────────────────────
 .env
+server/.env
 
-# Logs
-/logs
+# ─── Firebase secrets ─────────────────────────────────────────────────────────
+server/serviceAccountKey.json
+# .env.example is intentionally NOT ignored — commit it
 
-# Generated files
+# ─── Firebase client config ──────────────────────────────────────────────────
+# firebase-init.js contains only public client-side identifiers (apiKey,
+# projectId, etc.) — these are NOT secrets. Safe to commit.
+# See: https://firebase.google.com/docs/projects/api-keys
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ─── Generated / scratch files ────────────────────────────────────────────────
 directory_structure.txt
 file_list.txt
 project-structure.txt
-DEPLOYMENT.md
 
-# Firebase
-/config/firebase-config.js
+# ─── Test artifacts ───────────────────────────────────────────────────────────
+test-results.json
+group.json
+invite.json
+invite-real.json
+share.json
+sync.json
 
-# OS-generated files
+# ─── Shell convenience scripts (not for deployment) ───────────────────────────
+run-server.cmd
+start-server.bat
+
+# ─── Upload temp (if we ever switch to disk storage) ──────────────────────────
+server/uploads/
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Editor directories and files
+# ─── Editor ───────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
-
-server/serviceAccountKey.json
-js/firebase-init.js
-js/firebase-config.js
+*.swp

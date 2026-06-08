@@ -1,9 +1,7 @@
-// API Configuration - Updated for Render deployment
-if (typeof API_BASE_URL === 'undefined') {
-    const API_BASE_URL = window.location.hostname === 'localhost' 
-        ? 'http://localhost:5000' 
-        : 'https://securegov-backend.onrender.com';
-    
-    // Export for use in other files
-    window.API_CONFIG = { BASE_URL: API_BASE_URL };
-}
+/* js/config.js — SecureGov API configuration */
+
+/* Properly global — no const inside if block */
+window.API_BASE_URL = (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) ? 'http://localhost:5000' : 'https://securegov-backend.onrender.com';

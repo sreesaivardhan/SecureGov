@@ -1,250 +1,150 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Groups - SecureGov</title>
-    <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/family.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family — SecureGov</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div id="app">
-        <!-- Header -->
-        <header class="header">
-            <div class="container">
-                <div class="header-content">
-                    <div class="logo">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>SecureGov</span>
-                    </div>
-                    <nav class="nav">
-                        <a href="../index.html">Dashboard</a>
-                        <a href="../pages/documents.html">Documents</a>
-                        <a href="../pages/family.html" class="active">Family</a>
-                        <a href="../pages/profile.html">Profile</a>
-                        <a href="#" onclick="logout()">Logout</a>
-                    </nav>
-                </div>
-            </div>
-        </header>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <div class="container">
-                <!-- Page Header -->
-                <div class="page-header">
-                    <h1><i class="fas fa-users"></i> Family Members</h1>
-                    <div class="header-actions">
-                        <button class="btn btn-secondary" onclick="checkPendingInvitations()">
-                            <i class="fas fa-envelope"></i> 
-                            Invitations 
-                            <span id="invitationBadge" class="badge">0</span>
-                        </button>
-                        <button class="btn btn-primary" onclick="openInviteFamilyModal()">
-                            <i class="fas fa-user-plus"></i> Invite Family Member
-                        </button>
-                    </div>
-                </div>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-                <!-- Pending Invitations Alert -->
-                <div id="pendingInvitationsAlert" class="alert alert-info" style="display: none;">
-                    <div class="alert-content">
-                        <i class="fas fa-info-circle"></i>
-                        <span>You have pending family group invitations!</span>
-                        <button class="btn btn-sm btn-primary" onclick="showPendingInvitations()">
-                            View Invitations
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Family Members List -->
-                <div class="family-members-section">
-                    <div id="familyGroupsContainer" class="family-members-container">
-                        <!-- Family members will be loaded here -->
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Invite Family Member Modal -->
-        <div id="inviteFamilyModal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-user-plus"></i> Invite Family Member</h3>
-                    <button class="close-btn" onclick="closeInviteFamilyModal()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <form id="inviteFamilyForm">
-                    <div class="form-group">
-                        <label for="inviteEmail">Email Address *</label>
-                        <input type="email" id="inviteEmail" name="email" required autocomplete="email">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="memberRelationship">Relationship *</label>
-                        <select id="memberRelationship" name="relationship" required>
-                            <option value="">Select relationship</option>
-                            <option value="spouse">Spouse</option>
-                            <option value="parent">Parent</option>
-                            <option value="child">Child</option>
-                            <option value="sibling">Sibling</option>
-                            <option value="grandparent">Grandparent</option>
-                            <option value="grandchild">Grandchild</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="closeInviteFamilyModal()">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane"></i> Send Invitation
-                        </button>
-                    </div>
-                </form>
-            </div>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <a href="dashboard.html" class="sidebar-logo">
+      <i class="fas fa-shield-alt"></i> SecureGov
+    </a>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html"  class="nav-link"><i class="fas fa-home"></i> Dashboard</a>
+      <a href="documents.html"  class="nav-link"><i class="fas fa-folder-open"></i> Documents</a>
+      <a href="family.html"     class="nav-link active"><i class="fas fa-users"></i> Family</a>
+      <a href="profile.html"    class="nav-link"><i class="fas fa-user"></i> Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar" id="sidebarUserAvatar">?</div>
+        <div class="user-info">
+          <div class="user-name"  id="sidebarUserName">—</div>
+          <div class="user-email" id="sidebarUserEmail"></div>
         </div>
+      </div>
+      <button class="btn btn-danger-outline btn-sm w-full" id="logoutBtn">
+        <i class="fas fa-sign-out-alt"></i> Sign Out
+      </button>
+    </div>
+  </aside>
 
-        <!-- Family Group Details Modal -->
-        <div id="groupDetailsModal" class="modal">
-            <div class="modal-content large">
-                <div class="modal-header">
-                    <h3 id="groupDetailsTitle"><i class="fas fa-users"></i> Family Group Details</h3>
-                    <button class="close-btn" onclick="closeGroupDetailsModal()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="group-details-tabs">
-                        <button class="tab-btn active" data-tab="members">
-                            <i class="fas fa-users"></i> Members
-                        </button>
-                        <button class="tab-btn" data-tab="invitations">
-                            <i class="fas fa-envelope"></i> Invitations
-                        </button>
-                        <button class="tab-btn" data-tab="settings">
-                            <i class="fas fa-cog"></i> Settings
-                        </button>
-                    </div>
-
-                    <!-- Members Tab -->
-                    <div id="membersTab" class="tab-content active">
-                        <div class="tab-header">
-                            <h4>Family Members</h4>
-                            <button class="btn btn-primary btn-sm" onclick="openInviteMemberModal()">
-                                <i class="fas fa-user-plus"></i> Invite Member
-                            </button>
-                        </div>
-                        <div id="membersList" class="members-list">
-                            <!-- Members will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Invitations Tab -->
-                    <div id="invitationsTab" class="tab-content">
-                        <div class="tab-header">
-                            <h4>Pending Invitations</h4>
-                        </div>
-                        <div id="invitationsList" class="invitations-list">
-                            <!-- Invitations will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Settings Tab -->
-                    <div id="settingsTab" class="tab-content">
-                        <div class="tab-header">
-                            <h4>Group Settings</h4>
-                        </div>
-                        <form id="groupSettingsForm" class="settings-form">
-                            <!-- Settings form will be loaded here -->
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Invite Member Modal -->
-        <div id="inviteMemberModal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-user-plus"></i> Invite Family Member</h3>
-                    <button class="close-btn" onclick="closeInviteMemberModal()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <form id="inviteMemberForm">
-                    <div class="form-group">
-                        <label for="inviteEmail">Email Address *</label>
-                        <input type="email" id="inviteEmail" name="email" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="inviteRole">Role</label>
-                        <select id="inviteRole" name="role">
-                            <option value="member">Member</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                    
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="closeInviteMemberModal()">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane"></i> Send Invitation
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Pending Invitations Modal -->
-        <div id="pendingInvitationsModal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-envelope"></i> Pending Invitations</h3>
-                    <button class="close-btn" onclick="closePendingInvitationsModal()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div id="pendingInvitationsList" class="pending-invitations-list">
-                        <!-- Pending invitations will be loaded here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Loading Spinner -->
-        <div id="loadingSpinner" class="loading-spinner">
-            <div class="spinner"></div>
-        </div>
-
-        <!-- Toast Notifications -->
-        <div id="toastContainer" class="toast-container"></div>
+  <div class="main-content">
+    <div class="top-bar">
+      <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+      <span class="top-bar-title">Family</span>
+      <div class="top-bar-actions">
+        <button class="theme-toggle" id="themeToggle"><i class="fas fa-sun"></i></button>
+      </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-storage-compat.min.js"></script>
-    <script>
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "demo-key",
-            authDomain: "securegov-demo.firebaseapp.com",
-            projectId: "securegov-demo",
-            storageBucket: "securegov-demo.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef123456"
-        };
-        
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const storage = firebase.storage();
-    </script>
-    <script src="../js/family.js"></script>
+    <div class="page-body">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Family Groups</h1>
+          <p class="page-subtitle">Manage family members and document sharing</p>
+        </div>
+        <button class="btn btn-primary" id="createGroupBtn">
+          <i class="fas fa-plus"></i> Create Group
+        </button>
+      </div>
+
+      <!-- Received invitations banner -->
+      <div id="receivedBanner" style="display:none;" class="alert alert-info mb-4">
+        <i class="fas fa-envelope"></i>
+        <span id="receivedBannerText">You have pending invitations.</span>
+        <button class="btn btn-sm btn-primary" onclick="scrollToInvitations()">View</button>
+      </div>
+
+      <!-- Family groups -->
+      <div id="groupsList">
+        <div class="empty-state"><span class="spinner spinner-lg"></span></div>
+      </div>
+
+      <!-- Invitations section -->
+      <div id="invitationsSection" style="margin-top:40px;">
+        <div class="section-header">
+          <span class="section-title">Invitations</span>
+        </div>
+        <div id="invitationsList">
+          <div class="empty-state"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal-overlay" id="createGroupModal">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title">Create Family Group</h2>
+      <button class="modal-close" onclick="closeModal('createGroupModal')">&times;</button>
+    </div>
+    <form id="createGroupForm" class="modal-body" novalidate>
+      <div class="form-group">
+        <label for="groupName">Group name <span class="text-accent">*</span></label>
+        <input type="text" id="groupName" class="form-control"
+               placeholder="e.g. Sharma Family" required autocomplete="off">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="createGroupBtn2">
+          <i class="fas fa-plus"></i> Create
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Invite Member Modal -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title">Invite Family Member</h2>
+      <button class="modal-close" onclick="closeModal('inviteModal')">&times;</button>
+    </div>
+    <form id="inviteForm" class="modal-body" novalidate>
+      <div class="form-group">
+        <label for="inviteEmail">Email address <span class="text-accent">*</span></label>
+        <input type="email" id="inviteEmail" class="form-control"
+               placeholder="member@example.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="inviteRole">Role</label>
+        <select id="inviteRole" class="form-control">
+          <option value="member">Member — can share docs with group</option>
+          <option value="viewer">Viewer — view only</option>
+        </select>
+      </div>
+      <div class="form-hint">
+        An invitation email will be sent. If email is not configured,
+        the invitation link will appear in the server console.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('inviteModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="inviteSubmitBtn">
+          <i class="fas fa-paper-plane"></i> Send Invitation
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+<script src="../js/firebase-init.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/family.js"></script>
 </body>
 </html>

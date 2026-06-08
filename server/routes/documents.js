@@ -1,864 +1,366 @@
-const express = require('express');
-const { ObjectId } = require('mongodb');
-const multer = require('multer');
-const { Document, DOCUMENT_CATEGORIES } = require('../models/Document');
-const { uploadToFirebase, deleteFromFirebase, getSignedUrl } = require('../config/firebase-storage');
-const { FamilyGroup, FAMILY_ROLES } = require('../models/FamilyGroup');
-const { authenticateUser } = require('../middleware/auth');
-const SecurityMiddleware = require('../middleware/security');
+'use strict';
 
-const router = express.Router();
+const express   = require('express');
+const multer    = require('multer');
+const mongoose  = require('mongoose');
+const router    = express.Router();
 
-// Configure multer for memory storage (Firebase upload)
+const { verifyToken }                         = require('../middleware/auth');
+const Document                                = require('../models/Document');
+const FamilyGroup                             = require('../models/FamilyGroup');
+const { uploadFile, getSignedUrl, deleteFile } = require('../services/firebaseStorage');
+
+// ─── Multer setup ─────────────────────────────────────────────────────────────
+
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+]);
+
+const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    if (allowedTypes.includes(file.mimetype)) {
+  limits:  { fileSize: MAX_SIZE_BYTES },
+  fileFilter(_req, file, cb) {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type'), false);
+      // Passing an error here causes multer to call next(err)
+      cb(Object.assign(
+        new Error('Only PDF, JPG, and PNG files are allowed.'),
+        { status: 400 }
+      ));
     }
   },
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
 });
 
-// Upload document with Firebase Storage
-router.post('/upload', SecurityMiddleware.verifyFirebaseToken, SecurityMiddleware.loadUserProfile, upload.single('document'), async (req, res) => {
-  try {
-    const { file } = req;
-    
-    if (!file) {
+// ─── Valid categories (must match Document model enum) ────────────────────────
+
+const VALID_CATEGORIES = new Set([
+  'aadhaar', 'pan', 'passport', 'driving_license',
+  'marksheet', 'certificate', 'medical', 'financial', 'other',
+]);
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+/**
+ * Strip internal fields before sending a document to the client.
+ * firebaseStoragePath stays server-side — clients use /download to get a URL.
+ */
+function toPublic(doc) {
+  return {
+    id:           doc._id,
+    title:        doc.title,
+    category:     doc.category,
+    description:  doc.description,
+    mimeType:     doc.mimeType,
+    fileSize:     doc.fileSize,
+    uploadedBy:   doc.uploadedBy,
+    sharedWith:   doc.sharedWith,
+    status:       doc.status,
+    uploadDate:   doc.uploadDate,
+    lastModified: doc.lastModified,
+  };
+}
+
+/** Sanitize a filename for safe use in a storage path */
+function sanitizeName(name) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+// ─── POST /api/documents/upload ───────────────────────────────────────────────
+
+router.post(
+  '/upload',
+  verifyToken,
+  upload.single('file'),           // multer processes multipart BEFORE the handler
+  async (req, res) => {
+    const { title, category, description } = req.body;
+
+    // Field validation
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'File is required.' });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'title is required.' });
+    }
+    if (!category || !VALID_CATEGORIES.has(category)) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded'
+        message: `category must be one of: ${[...VALID_CATEGORIES].join(', ')}`,
       });
     }
 
-    // Validate category
-    const category = req.body.category || DOCUMENT_CATEGORIES.OTHER.GENERAL;
-    const validCategories = Object.values(DOCUMENT_CATEGORIES).flatMap(cat => Object.values(cat));
-    if (!validCategories.includes(category)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid document category'
-      });
-    }
+    const { uid }        = req.user;
+    const timestamp      = Date.now();
+    const safeName       = sanitizeName(req.file.originalname);
+    const destination    = `documents/${uid}/${timestamp}-${safeName}`;
 
     // Upload to Firebase Storage
-    // For now, skip Firebase upload and store directly in MongoDB
-    // const firebaseResult = await uploadToFirebase(file, req.user.uid, category);
-
-    const documentMetadata = {
-      title: req.body.title || file.originalname,
-      description: req.body.description || '',
-      category: category,
-      subcategory: req.body.subcategory || '',
-      department: req.body.department || 'citizen',
-      classification: req.body.classification || 'private',
-      uploadDate: new Date(),
-      lastModified: new Date(),
-      uploadedBy: req.user.uid,
-      fileId: new ObjectId(),
-      fileName: file.originalname,
-      originalName: file.originalname,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      downloadCount: 0,
-      tags: req.body.tags ? req.body.tags.split(',').map(tag => tag.trim()) : [],
-      permissions: {
-        read: [req.user.uid],
-        write: [req.user.uid],
-        admin: [req.user.uid]
-      },
-      status: 'active',
-      version: 1,
-      expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : null,
-      issueDate: req.body.issueDate ? new Date(req.body.issueDate) : null,
-      documentNumber: req.body.documentNumber || '',
-      issuingAuthority: req.body.issuingAuthority || '',
-      verificationStatus: 'pending',
-      metadata: {
-        firebaseUrl: '',
-        extractedText: '',
-        ocrProcessed: false,
-        thumbnailPath: '',
-        checksum: ''
-      },
-      // Store file data directly in MongoDB for now
-      fileData: file.buffer.toString('base64')
-    };
-
-    // Connect to MongoDB and insert document
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');
-    await client.connect();
-    const db = client.db('secureGovDocs');
-    const result = await db.collection('documents').insertOne(documentMetadata);
-    await client.close();
-
-    res.status(201).json({
-      success: true,
-      message: 'Document uploaded successfully',
-      documentId: result.insertedId,
-      fileId: documentMetadata.fileId,
-      category: category,
-      firebaseUrl: ''
-    });
-
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Upload failed'
-    });
-  }
-});
-
-// Get user documents with enhanced filtering
-router.get('/', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const skip = (page - 1) * limit;
-
-    const filter = {
-      status: 'active',
-      $or: [
-        { uploadedBy: req.user.uid },
-        { 'permissions.read': req.user.uid }
-      ]
-    };
-
-    // Category filter
-    if (req.query.category) {
-      filter.category = req.query.category;
-    }
-
-    // Department filter
-    if (req.query.department) {
-      filter.department = req.query.department;
-    }
-
-    // Classification filter
-    if (req.query.classification) {
-      filter.classification = req.query.classification;
-    }
-
-    // Verification status filter
-    if (req.query.verificationStatus) {
-      filter.verificationStatus = req.query.verificationStatus;
-    }
-
-    // Date range filter
-    if (req.query.dateFrom || req.query.dateTo) {
-      filter.uploadDate = {};
-      if (req.query.dateFrom) {
-        filter.uploadDate.$gte = new Date(req.query.dateFrom);
-      }
-      if (req.query.dateTo) {
-        filter.uploadDate.$lte = new Date(req.query.dateTo);
-      }
-    }
-
-    // Search filter
-    if (req.query.search) {
-      filter.$and = filter.$and || [];
-      filter.$and.push({
-        $or: [
-          { title: { $regex: req.query.search, $options: 'i' } },
-          { description: { $regex: req.query.search, $options: 'i' } },
-          { originalName: { $regex: req.query.search, $options: 'i' } },
-          { documentNumber: { $regex: req.query.search, $options: 'i' } },
-          { tags: { $in: [new RegExp(req.query.search, 'i')] } }
-        ]
-      });
-    }
-
-    // Sort options
-    const sortOptions = {};
-    const sortBy = req.query.sortBy || 'uploadDate';
-    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
-    sortOptions[sortBy] = sortOrder;
-
-    // Connect to MongoDB and fetch documents
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');
-    await client.connect();
-    const db = client.db('secureGovDocs');
-    
-    const documents = await db.collection('documents')
-      .find(filter)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-
-    const total = await db.collection('documents').countDocuments(filter);
-
-    // Get category statistics
-    const categoryStats = await db.collection('documents').aggregate([
-      { $match: { uploadedBy: req.user.uid, status: 'active' } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]).toArray();
-
-    await client.close();
-
-    res.json({
-      success: true,
-      documents: documents,
-      pagination: {
-        page: page,
-        limit: limit,
-        total: total,
-        pages: Math.ceil(total / limit)
-      },
-      categoryStats: categoryStats,
-      availableCategories: DOCUMENT_CATEGORIES
-    });
-
-  } catch (error) {
-    console.error('Fetch documents error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch documents'
-    });
-  }
-});
-
-// Get document statistics
-router.get('/stats', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
-  try {
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');
-    await client.connect();
-    const db = client.db('secureGovDocs');
-    
-    const totalDocs = await db.collection('documents').countDocuments({
-      uploadedBy: req.user.uid,
-      status: 'active'
-    });
-
-    const sharedDocs = await db.collection('documents').countDocuments({
-      uploadedBy: req.user.uid,
-      status: 'active',
-      'permissions.read': { $exists: true, $not: { $size: 1 } }
-    });
-
-    await client.close();
-
-    res.json({
-      success: true,
-      total: totalDocs,
-      shared: sharedDocs
-    });
-
-  } catch (error) {
-    console.error('Stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch statistics'
-    });
-  }
-});
-
-// Download document
-router.get('/:id/download', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
-  try {
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(process.env.MONGODB_URI || 'mongodb://localhost:27017');
-    await client.connect();
-    const db = client.db('secureGovDocs');
-
-    const document = await db.collection('documents').findOne({
-      _id: new ObjectId(req.params.id),
-      $or: [
-        { uploadedBy: req.user.uid },
-        { 'permissions.read': req.user.uid }
-      ]
-    });
-
-    if (!document) {
-      await client.close();
-      return res.status(404).json({ success: false, message: 'Document not found' });
-    }
-
-    // Update download count
-    await db.collection('documents').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $inc: { downloadCount: 1 } }
+    const { path: storagePath, url } = await uploadFile(
+      req.file.buffer,
+      destination,
+      req.file.mimetype
     );
 
-    await client.close();
-
-    // Set headers for file download
-    res.set({
-      'Content-Type': document.mimeType,
-      'Content-Disposition': `attachment; filename="${document.originalName}"`
+    // Persist metadata in MongoDB
+    const doc = await Document.create({
+      title:               title.trim(),
+      category,
+      description:         description ? description.trim() : '',
+      firebaseStoragePath: storagePath,
+      firebaseUrl:         url,
+      mimeType:            req.file.mimetype,
+      fileSize:            req.file.size,
+      uploadedBy:          uid,
     });
 
-    // Send file data from base64
-    const fileBuffer = Buffer.from(document.fileData, 'base64');
-    res.send(fileBuffer);
-
-  } catch (error) {
-    console.error('Download error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Download failed'
-    });
+    return res.status(201).json({ success: true, document: toPublic(doc) });
   }
+);
+
+// ─── GET /api/documents ───────────────────────────────────────────────────────
+
+router.get('/', verifyToken, async (req, res) => {
+  const { uid }             = req.user;
+  const { category, search } = req.query;
+
+  const filter = { uploadedBy: uid, status: 'active' };
+
+  if (category) {
+    if (!VALID_CATEGORIES.has(category)) {
+      return res.status(400).json({ success: false, message: 'Invalid category filter.' });
+    }
+    filter.category = category;
+  }
+
+  if (search && search.trim()) {
+    // Case-insensitive title search
+    filter.title = { $regex: search.trim(), $options: 'i' };
+  }
+
+  const docs = await Document.find(filter).sort({ uploadDate: -1 });
+
+  return res.json({
+    success:   true,
+    total:     docs.length,
+    documents: docs.map(toPublic),
+  });
 });
 
-// Share document with individual user or family group
-router.post('/:id/share', SecurityMiddleware.verifyFirebaseToken, async (req, res) => {
-  try {
-    const { email, permission, familyGroupId, shareType } = req.body;
-    
-    if (!permission || !['read', 'write'].includes(permission)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid permission (read/write) is required'
-      });
-    }
+// ─── GET /api/documents/stats ─────────────────────────────────────────────────
+// ⚠️  Must be registered BEFORE /:id routes so "stats" is not treated as an id.
 
-    const db = await getDB();
-    const document = req.document;
+router.get('/stats', verifyToken, async (req, res) => {
+  const { uid } = req.user;
 
-    if (shareType === 'family' && familyGroupId) {
-      // Share with family group
-      const familyGroup = await FamilyGroup.findById(familyGroupId);
-      
-      if (!familyGroup) {
-        return res.status(404).json({
-          success: false,
-          message: 'Family group not found'
-        });
-      }
+  // Lean projection — only pull the fields we need
+  const docs = await Document
+    .find({ uploadedBy: uid, status: 'active' })
+    .select('fileSize category')
+    .lean();
 
-      // Check if user is member of the family group
-      if (!familyGroup.isMember(req.user.uid)) {
-        return res.status(403).json({
-          success: false,
-          message: 'You are not a member of this family group'
-        });
-      }
+  const totalSizeBytes = docs.reduce((sum, d) => sum + d.fileSize, 0);
 
-      // Add all active family members to document permissions
-      const activeMembers = familyGroup.members.filter(m => m.status === 'active');
-      const memberIds = activeMembers.map(m => m.userId);
+  // Build category breakdown
+  const categoryMap = {};
+  docs.forEach((d) => {
+    categoryMap[d.category] = (categoryMap[d.category] || 0) + 1;
+  });
+  const categories = Object.entries(categoryMap)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
 
-      const updateFields = {
-        $addToSet: {
-          [`permissions.${permission}`]: { $each: memberIds }
-        },
-        $set: { 
-          lastModified: new Date(),
-          [`familySharing.${familyGroupId}`]: {
-            groupName: familyGroup.name,
-            permission: permission,
-            sharedAt: new Date(),
-            sharedBy: req.user.uid
-          }
-        }
-      };
-
-      await collections.documents().updateOne(
-        { _id: new ObjectId(req.params.id) },
-        updateFields
-      );
-
-      res.json({
-        success: true,
-        message: `Document shared with family group "${familyGroup.name}"`,
-        sharedWith: activeMembers.length,
-        familyGroup: {
-          id: familyGroup._id,
-          name: familyGroup.name
-        }
-      });
-
-    } else if (shareType === 'individual' && email) {
-      // Share with individual user
-      if (!email || !email.includes('@')) {
-        return res.status(400).json({
-          success: false,
-          message: 'Valid email address is required'
-        });
-      }
-
-      try {
-        // Find user by email via Firebase Admin
-        const targetUser = await admin.auth().getUserByEmail(email);
-        
-        // Update document permissions
-        const updateResult = await collections.documents().updateOne(
-          { _id: new ObjectId(req.params.id) },
-          { 
-            $addToSet: { [`permissions.${permission}`]: targetUser.uid },
-            $set: { 
-              lastModified: new Date(),
-              [`individualSharing.${targetUser.uid}`]: {
-                email: targetUser.email,
-                displayName: targetUser.displayName || targetUser.email,
-                permission: permission,
-                sharedAt: new Date(),
-                sharedBy: req.user.uid
-              }
-            }
-          }
-        );
-
-        if (updateResult.matchedCount === 0) {
-          return res.status(404).json({
-            success: false,
-            message: 'Document not found'
-          });
-        }
-
-        res.json({
-          success: true,
-          message: `Document shared with ${targetUser.email}`,
-          sharedWith: {
-            email: targetUser.email,
-            displayName: targetUser.displayName || targetUser.email
-          }
-        });
-
-      } catch (userError) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found with this email address'
-        });
-      }
-
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid share type or missing required fields'
-      });
-    }
-
-  } catch (error) {
-    console.error('Share error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to share document'
-    });
-  }
+  return res.json({
+    success: true,
+    stats: {
+      totalDocs:      docs.length,
+      totalSizeBytes,
+      totalSizeMB:    parseFloat((totalSizeBytes / (1024 * 1024)).toFixed(2)),
+      categories,
+    },
+  });
 });
 
-// Get shared documents (individual and family)
-router.get('/shared', authenticateUser, async (req, res) => {
-  try {
-    const db = await getDB();
-    const { type } = req.query; // 'individual', 'family', or 'all'
-    
-    // Find documents where user has read permission but is not the owner
-    const sharedDocs = await collections.documents()
-      .find({
-        status: 'active',
-        uploadedBy: { $ne: req.user.uid },
-        'permissions.read': req.user.uid
-      })
-      .sort({ lastModified: -1 })
-      .toArray();
+// ─── GET /api/documents/:id/download ─────────────────────────────────────────
 
-    // Categorize documents by sharing type
-    const categorizedDocs = {
-      individual: [],
-      family: [],
-      all: sharedDocs
-    };
+router.get('/:id/download', verifyToken, async (req, res) => {
+  const { uid } = req.user;
+  const { id }  = req.params;
 
-    sharedDocs.forEach(doc => {
-      const hasIndividualSharing = doc.individualSharing && 
-        Object.keys(doc.individualSharing).includes(req.user.uid);
-      const hasFamilySharing = doc.familySharing && 
-        Object.keys(doc.familySharing).length > 0;
-
-      if (hasIndividualSharing) {
-        categorizedDocs.individual.push(doc);
-      }
-      if (hasFamilySharing) {
-        categorizedDocs.family.push(doc);
-      }
-    });
-
-    const responseData = {
-      success: true,
-      documents: type ? categorizedDocs[type] || [] : categorizedDocs.all,
-      summary: {
-        total: sharedDocs.length,
-        individual: categorizedDocs.individual.length,
-        family: categorizedDocs.family.length
-      }
-    };
-
-    if (!type) {
-      responseData.categorized = {
-        individual: categorizedDocs.individual,
-        family: categorizedDocs.family
-      };
-    }
-
-    res.json(responseData);
-
-  } catch (error) {
-    console.error('Shared documents error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch shared documents'
-    });
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid document ID.' });
   }
+
+  const doc = await Document.findOne({ _id: id, status: 'active' });
+  if (!doc) {
+    return res.status(404).json({ success: false, message: 'Document not found.' });
+  }
+
+  // Access control: owner OR shared with this user
+  const isOwner  = doc.uploadedBy === uid;
+  const isShared = doc.sharedWith.some((s) => s.uid === uid);
+
+  if (!isOwner && !isShared) {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
+
+  // Always generate a fresh signed URL — the stored one may have expired
+  const url      = await getSignedUrl(doc.firebaseStoragePath);
+  const filename = sanitizeName(doc.title);
+
+  return res.json({
+    success:  true,
+    url,
+    filename,
+    mimeType: doc.mimeType,
+    fileSize: doc.fileSize,
+  });
 });
 
-// Get single document details
-router.get('/:id', authenticateUser, async (req, res) => {
-  try {
-    const document = req.document;
-    
-    res.json({
-      success: true,
-      document: document
-    });
+// ─── DELETE /api/documents/:id ────────────────────────────────────────────────
 
-  } catch (error) {
-    console.error('Get document error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch document'
-    });
+router.delete('/:id', verifyToken, async (req, res) => {
+  const { uid } = req.user;
+  const { id }  = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid document ID.' });
   }
+
+  const doc = await Document.findOne({ _id: id, status: 'active' });
+  if (!doc) {
+    return res.status(404).json({ success: false, message: 'Document not found.' });
+  }
+
+  // Only the owner can delete
+  if (doc.uploadedBy !== uid) {
+    return res.status(403).json({ success: false, message: 'Only the document owner can delete it.' });
+  }
+
+  // Delete from Firebase Storage first (idempotent — won't crash if already gone)
+  await deleteFile(doc.firebaseStoragePath);
+
+  // Soft delete in MongoDB
+  doc.status       = 'deleted';
+  doc.lastModified = new Date();
+  await doc.save();
+
+  return res.json({ success: true, message: 'Document deleted successfully.' });
 });
 
-// Update document metadata
-router.put('/:id', authenticateUser, async (req, res) => {
-  try {
-    const updateData = {
-      lastModified: new Date()
-    };
+// ─── GET /api/documents/shared-with-me ─────────────────────────────────────────────
+// NOTE: registered BEFORE /:id/* routes so this path is not captured as an :id
 
-    // Only update allowed fields
-    const allowedFields = [
-      'title', 'description', 'category', 'subcategory', 'department', 
-      'classification', 'tags', 'expiryDate', 'issueDate', 
-      'documentNumber', 'issuingAuthority', 'verificationStatus'
-    ];
+router.get('/shared-with-me', verifyToken, async (req, res) => {
+  const { uid } = req.user;
 
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        if (field === 'tags' && typeof req.body[field] === 'string') {
-          updateData[field] = req.body[field].split(',').map(tag => tag.trim());
-        } else if (field === 'expiryDate' || field === 'issueDate') {
-          updateData[field] = req.body[field] ? new Date(req.body[field]) : null;
-        } else {
-          updateData[field] = req.body[field];
-        }
-      }
-    });
+  const docs = await Document
+    .find({ 'sharedWith.uid': uid, status: 'active' })
+    .sort({ uploadDate: -1 });
 
-    // Validate category if provided
-    if (updateData.category) {
-      const validCategories = Object.values(DOCUMENT_CATEGORIES).flatMap(cat => Object.values(cat));
-      if (!validCategories.includes(updateData.category)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid document category'
-        });
-      }
-    }
-
-    const db = await getDB();
-    const result = await collections.documents().updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: updateData }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    // Get updated document
-    const updatedDocument = await collections.documents().findOne({
-      _id: new ObjectId(req.params.id)
-    });
-
-    res.json({
-      success: true,
-      message: 'Document updated successfully',
-      document: updatedDocument
-    });
-
-  } catch (error) {
-    console.error('Update error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update document'
-    });
-  }
+  return res.json({
+    success:   true,
+    total:     docs.length,
+    documents: docs.map(toPublic),
+  });
 });
 
-// Delete document with enhanced validation
-router.delete('/:id', authenticateUser, async (req, res) => {
-  try {
-    const document = req.document;
-    const db = await getDB();
+// ─── POST /api/documents/:id/share ──────────────────────────────────────────────────
 
-    // Check if document has Firebase URL or GridFS fileId
-    if (document.metadata && document.metadata.firebaseUrl) {
-      // Delete from Firebase Storage
-      try {
-        await deleteFromFirebase(document.fileName);
-      } catch (error) {
-        console.warn('Firebase delete warning:', error.message);
-      }
-    } else if (document.fileId) {
-      // Delete from GridFS
-      try {
-        const gridfsBucket = getGridFSBucket();
-        await gridfsBucket.delete(new ObjectId(document.fileId));
-      } catch (error) {
-        console.warn('GridFS delete warning:', error.message);
-      }
-    }
+router.post('/:id/share', verifyToken, async (req, res) => {
+  const { uid } = req.user;
+  const { id }  = req.params;
+  const { targetUid } = req.body;
 
-    // Soft delete - mark as deleted instead of removing
-    const result = await collections.documents().updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { 
-        $set: { 
-          status: 'deleted',
-          lastModified: new Date(),
-          deletedAt: new Date(),
-          deletedBy: req.user.uid
-        }
-      }
-    );
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid document ID.' });
+  }
+  if (!targetUid || typeof targetUid !== 'string') {
+    return res.status(400).json({ success: false, message: 'targetUid is required.' });
+  }
+  if (targetUid === uid) {
+    return res.status(400).json({ success: false, message: 'You cannot share a document with yourself.' });
+  }
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
+  // Load the document
+  const doc = await Document.findOne({ _id: id, status: 'active' });
+  if (!doc) {
+    return res.status(404).json({ success: false, message: 'Document not found.' });
+  }
+  if (doc.uploadedBy !== uid) {
+    return res.status(403).json({ success: false, message: 'Only the document owner can share it.' });
+  }
 
-    res.json({
-      success: true,
-      message: 'Document deleted successfully'
-    });
+  // Verify targetUid is a member of at least one of the owner's family groups
+  const ownerGroups = await FamilyGroup.find({ 'members.uid': uid, status: 'active' });
 
-  } catch (error) {
-    console.error('Delete error:', error);
-    res.status(500).json({
+  let targetEmail = null;
+  for (const group of ownerGroups) {
+    const member = group.members.find((m) => m.uid === targetUid);
+    if (member) { targetEmail = member.email; break; }
+  }
+
+  if (!targetEmail) {
+    return res.status(403).json({
       success: false,
-      message: 'Failed to delete document'
+      message: 'targetUid is not a member of any of your family groups.',
     });
   }
+
+  // Prevent duplicate share
+  const alreadyShared = doc.sharedWith.some((s) => s.uid === targetUid);
+  if (alreadyShared) {
+    return res.status(409).json({ success: false, message: 'Document is already shared with this user.' });
+  }
+
+  // Sharing is read-only for MVP
+  doc.sharedWith.push({ uid: targetUid, email: targetEmail, permission: 'read' });
+  doc.lastModified = new Date();
+  await doc.save();
+
+  return res.json({
+    success:  true,
+    message:  `Document shared with ${targetEmail}.`,
+    document: toPublic(doc),
+  });
 });
 
-// Restore deleted document
-router.post('/:id/restore', authenticateUser, async (req, res) => {
-  try {
-    const db = await getDB();
-    const result = await collections.documents().updateOne(
-      { _id: new ObjectId(req.params.id), status: 'deleted' },
-      { 
-        $set: { 
-          status: 'active',
-          lastModified: new Date()
-        },
-        $unset: {
-          deletedAt: '',
-          deletedBy: ''
-        }
-      }
-    );
+// ─── DELETE /api/documents/:id/share/:uid ────────────────────────────────────
+// Revoke sharing access from a specific user.
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Deleted document not found'
-      });
-    }
+router.delete('/:id/share/:uid', verifyToken, async (req, res) => {
+  const { uid: requesterUid } = req.user;
+  const { id, uid: targetUid } = req.params;
 
-    res.json({
-      success: true,
-      message: 'Document restored successfully'
-    });
-
-  } catch (error) {
-    console.error('Restore error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to restore document'
-    });
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid document ID.' });
   }
-});
 
-// Get user's family groups for sharing
-router.get('/family-groups', authenticateUser, async (req, res) => {
-  try {
-    const familyGroups = await FamilyGroup.find({
-      $or: [
-        { createdBy: req.user.uid },
-        { 'members.userId': req.user.uid, 'members.status': 'active' }
-      ],
-      status: 'active'
-    }).select('_id name description members statistics');
-
-    // Only return groups where user has permission to share documents
-    const shareableGroups = familyGroups.filter(group => {
-      const userRole = group.getMemberRole(req.user.uid);
-      return userRole === FAMILY_ROLES.ADMIN || userRole === FAMILY_ROLES.MEMBER;
-    });
-
-    res.json({
-      success: true,
-      familyGroups: shareableGroups
-    });
-
-  } catch (error) {
-    console.error('Get family groups error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch family groups'
-    });
+  const doc = await Document.findOne({ _id: id, status: 'active' });
+  if (!doc) {
+    return res.status(404).json({ success: false, message: 'Document not found.' });
   }
-});
 
-// Remove document sharing
-router.delete('/:id/share', authenticateUser, async (req, res) => {
-  try {
-    const { userId, familyGroupId, shareType } = req.body;
-    
-    if (!shareType || !['individual', 'family'].includes(shareType)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid share type is required'
-      });
-    }
-
-    const db = await getDB();
-    let updateFields = {
-      $set: { lastModified: new Date() }
-    };
-
-    if (shareType === 'individual' && userId) {
-      // Remove individual user from permissions
-      updateFields.$pull = {
-        'permissions.read': userId,
-        'permissions.write': userId
-      };
-      updateFields.$unset = {
-        [`individualSharing.${userId}`]: ''
-      };
-
-    } else if (shareType === 'family' && familyGroupId) {
-      // Remove family group sharing
-      const familyGroup = await FamilyGroup.findById(familyGroupId);
-      
-      if (familyGroup) {
-        const memberIds = familyGroup.members
-          .filter(m => m.status === 'active')
-          .map(m => m.userId);
-
-        updateFields.$pullAll = {
-          'permissions.read': memberIds,
-          'permissions.write': memberIds
-        };
-        updateFields.$unset = {
-          [`familySharing.${familyGroupId}`]: ''
-        };
-      }
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required parameters for share removal'
-      });
-    }
-
-    const result = await collections.documents().updateOne(
-      { _id: new ObjectId(req.params.id) },
-      updateFields
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Document sharing removed successfully'
-    });
-
-  } catch (error) {
-    console.error('Remove sharing error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to remove document sharing'
-    });
+  // Only the owner can revoke access
+  if (doc.uploadedBy !== requesterUid) {
+    return res.status(403).json({ success: false, message: 'Only the document owner can revoke sharing.' });
   }
-});
 
-// Get document sharing details
-router.get('/:id/sharing', authenticateUser, async (req, res) => {
-  try {
-    const document = req.document;
-    
-    const sharingDetails = {
-      individual: {},
-      family: {},
-      permissions: document.permissions
-    };
+  const before = doc.sharedWith.length;
+  doc.sharedWith    = doc.sharedWith.filter((s) => s.uid !== targetUid);
+  doc.lastModified  = new Date();
 
-    // Get individual sharing details
-    if (document.individualSharing) {
-      sharingDetails.individual = document.individualSharing;
-    }
-
-    // Get family sharing details with group info
-    if (document.familySharing) {
-      const familyGroupIds = Object.keys(document.familySharing);
-      
-      for (const groupId of familyGroupIds) {
-        const familyGroup = await FamilyGroup.findById(groupId)
-          .select('_id name description members statistics');
-        
-        if (familyGroup) {
-          sharingDetails.family[groupId] = {
-            ...document.familySharing[groupId],
-            groupInfo: {
-              name: familyGroup.name,
-              description: familyGroup.description,
-              memberCount: familyGroup.activeMembersCount
-            }
-          };
-        }
-      }
-    }
-
-    res.json({
-      success: true,
-      sharing: sharingDetails
-    });
-
-  } catch (error) {
-    console.error('Get sharing details error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch sharing details'
-    });
+  if (doc.sharedWith.length === before) {
+    return res.status(404).json({ success: false, message: 'User does not have access to this document.' });
   }
+
+  await doc.save();
+
+  return res.json({ success: true, message: 'Access revoked.', document: toPublic(doc) });
 });
 
 module.exports = router;
