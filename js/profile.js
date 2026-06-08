@@ -36,7 +36,31 @@ async function loadProfile(user) {
   saveBtn.disabled = true;
 
   try {
-    const res     = await apiFetch('/api/profile');
+    let res;
+    try {
+      res = await apiFetch('/api/profile');
+    } catch (err) {
+      if (err.status === 404) {
+        // No MongoDB record yet — sync the user first, then retry once.
+        // This happens when a Google sign-in's syncUser() was a no-op or raced.
+        try {
+          const fbUser = firebase.auth().currentUser;
+          const token  = await fbUser.getIdToken();
+          await fetch(`${window.API_BASE_URL}/api/auth/sync`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: fbUser.displayName || '' }),
+          });
+          res = await apiFetch('/api/profile');
+        } catch (_) {
+          // Sync or retry failed — fall back to Firebase data silently
+          res = { profile: {} };
+        }
+      } else {
+        throw err; // real error — let the outer catch handle it
+      }
+    }
+
     const profile = res.profile || {};
 
     // Sidebar + avatar

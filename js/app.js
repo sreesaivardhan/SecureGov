@@ -211,18 +211,19 @@
 
   function friendlyAuthError(code) {
     const map = {
-      'auth/user-not-found':          'No account found with this email.',
-      'auth/wrong-password':          'Incorrect password.',
-      'auth/invalid-email':           'Please enter a valid email address.',
-      'auth/email-already-in-use':    'An account already exists with this email.',
-      'auth/weak-password':           'Password must be at least 6 characters.',
-      'auth/too-many-requests':       'Too many attempts. Please wait a moment and try again.',
-      'auth/network-request-failed':  'Network error. Check your connection.',
-      'auth/invalid-credential':      'Invalid email or password.',
+      'auth/user-not-found':                       'No account found with that email.',
+      'auth/wrong-password':                       'Incorrect email or password.',
+      'auth/invalid-credential':                   'Incorrect email or password.',
+      'auth/invalid-login-credentials':            'Incorrect email or password.',
+      'auth/invalid-email':                        'Please enter a valid email address.',
+      'auth/email-already-in-use':                 'An account already exists with this email.',
+      'auth/weak-password':                        'Password must be at least 6 characters.',
+      'auth/too-many-requests':                    'Too many attempts. Please try again later.',
+      'auth/network-request-failed':               'Network error. Check your connection and try again.',
       'auth/account-exists-with-different-credential':
-                                      'An account already exists with this email. Sign in with your password.',
-      'auth/popup-blocked':           'Popup was blocked. Please allow popups for this site and try again.',
-      'auth/user-disabled':           'This account has been disabled. Contact support.',
+                                                   'An account already exists with this email. Sign in with your password.',
+      'auth/popup-blocked':                        'Popup was blocked. Please allow popups for this site and try again.',
+      'auth/user-disabled':                        'This account has been disabled. Contact support.',
     };
     return map[code] || 'Something went wrong. Please try again.';
   }
