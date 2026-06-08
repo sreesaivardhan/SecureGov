@@ -5,38 +5,39 @@ require('dotenv').config();
 
 const express = require('express');
 const { connectDB } = require('./db/mongoose');
-const corsMiddleware = require('./middleware/cors');
+const { corsMiddleware, corsOptions } = require('./middleware/cors');
 
 // ─── Route modules ────────────────────────────────────────────────────────────
-const authRoutes      = require('./routes/auth');
-const profileRoutes   = require('./routes/profile');
+const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile');
 const documentsRouter = require('./routes/documents'); // Day 2
-const familyRouter    = require('./routes/family');    // Day 3
+const familyRouter = require('./routes/family');    // Day 3
 // Day 4+: no more server-level changes needed
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────
 app.use(corsMiddleware);
+app.options('*', require('cors')(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
-    ok:          true,
-    uptime:      Math.floor(process.uptime()),
-    timestamp:   new Date().toISOString(),
+    ok: true,
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
   });
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
-app.use('/api/auth',      authRoutes);
-app.use('/api/profile',   profileRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/documents', documentsRouter);
-app.use('/api/family',    familyRouter);
+app.use('/api/family', familyRouter);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
