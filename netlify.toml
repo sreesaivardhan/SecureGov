@@ -7,7 +7,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://securegov-backend.onrender.com/api/:splat"
+  to = "https://securegov.onrender.com/api/:splat"
   status = 200
   force = true
 
@@ -23,7 +23,7 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com https://secure-gov-docs.firebaseapp.com https://securegov-backend.onrender.com; frame-src 'self' https://secure-gov-docs.firebaseapp.com https://accounts.google.com https://apis.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://accounts.google.com;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com https://secure-gov-docs.firebaseapp.com https://securegov.onrender.com; frame-src 'self' https://secure-gov-docs.firebaseapp.com https://accounts.google.com https://apis.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://accounts.google.com;"
 
 [[headers]]
   for = "/js/*"
