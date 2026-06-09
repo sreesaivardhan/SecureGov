@@ -95,8 +95,20 @@ async function apiFetch(path, options = {}) {
     throw new Error('Network error — is the backend running?');
   }
 
-  let data;
-  try { data = await response.json(); } catch (_) { data = {}; }
+  let data = {};
+  try {
+    const text = await response.text();
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.warn(`[apiFetch] Response was not valid JSON (status ${response.status}):`, text.substring(0, 200));
+        // If response is not ok, we handle it below. If it IS ok, we just leave data as {}.
+      }
+    }
+  } catch (textErr) {
+    console.warn('[apiFetch] Failed to read response text:', textErr);
+  }
 
   if (!response.ok) {
     const msg = data.message || `Request failed (${response.status})`;

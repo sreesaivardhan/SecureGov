@@ -298,8 +298,59 @@ async function handleUpload(e) {
 
 async function downloadDoc(id, title) {
   try {
+    showToast('Starting download...', 'info');
     const res = await apiFetch(`/api/documents/${id}/download`);
-    window.open(res.url, '_blank', 'noopener');
+    
+    // Try to extract original extension from the URL if the title doesn't have one
+    let ext = '';
+    try {
+      const urlObj = new URL(res.url);
+      const pathname = decodeURIComponent(urlObj.pathname);
+      const match = pathname.match(/\.([a-zA-Z0-9]+)$/);
+      if (match) ext = '.' + match[1];
+    } catch (_) {}
+    
+    let downloadName = title;
+    if (ext && !downloadName.toLowerCase().endsWith(ext.toLowerCase())) {
+      downloadName += ext;
+    }
+
+    try {
+      // Preferred approach: fetch as Blob to force download and bypass cross-origin restrictions on the `download` attribute
+      const fetchRes = await fetch(res.url);
+      if (!fetchRes.ok) throw new Error(`Blob fetch failed: ${fetchRes.status}`);
+      
+      const blob = await fetchRes.blob();
+      const objUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objUrl);
+      }, 100);
+      
+    } catch (blobErr) {
+      console.warn('[downloadDoc] Blob download failed, using fallback:', blobErr);
+      
+      // Fallback approach: open cross-origin URL in new tab using a temporary <a>
+      const a = document.createElement('a');
+      a.href = res.url;
+      a.download = downloadName;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      showToast('Download started in a new tab.', 'success');
+    }
   } catch (err) {
     showToast('Download failed: ' + err.message, 'error');
   }
