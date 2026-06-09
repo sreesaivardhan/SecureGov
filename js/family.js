@@ -334,9 +334,11 @@ async function handleInvite(e) {
       // Cold-start timeout — invite may still succeed on the backend
       closeModal('inviteModal');
       showToast(
-        'This is taking longer than expected. The invitation may still be sending — check back in a moment.',
+        'Invitation may have been sent. Please check pending invites or wait a moment before trying again.',
         'warning'
       );
+      // Attempt to refresh the list in the background — if the backend finishes soon, it will appear here
+      loadInvitations();
     } else {
       showToast(err.message || 'Failed to send invitation.', 'error');
     }

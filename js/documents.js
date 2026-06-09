@@ -159,10 +159,8 @@ function emptyState() {
 }
 
 function canPreview(mimeType) {
-  return mimeType && (
-    mimeType === 'application/pdf' ||
-    mimeType.startsWith('image/')
-  );
+  // Only images keep the inline preview modal, as PDF preview and download now behave similarly
+  return mimeType && mimeType.startsWith('image/');
 }
 
 function renderDocItem(doc) {
@@ -211,20 +209,7 @@ function renderDocItem(doc) {
 /* ── Preview ─────────────────────────────────────────────────── */
 
 async function previewDoc(id, title, mimeType) {
-  const isPDF = mimeType === 'application/pdf';
-
-  // PDFs: open in new tab — avoids CSP frame-src constraint for storage.googleapis.com
-  if (isPDF) {
-    try {
-      const res = await apiFetch(`/api/documents/${id}/download`);
-      window.open(res.url, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      showToast('Could not open PDF: ' + err.message, 'error');
-    }
-    return;
-  }
-
-  // Images: render inline in preview modal
+  // Images only: render inline in preview modal
   const frame   = document.getElementById('previewFrame');
   const img     = document.getElementById('previewImage');
   const spinner = document.getElementById('previewSpinner');
