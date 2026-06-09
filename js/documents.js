@@ -4,9 +4,9 @@
  * Depends on: firebase-init.js, config.js, utils.js
  */
 
-let currentTab     = 'mine';
-let familyMembers  = [];
-let shareTargetId  = null;
+let currentTab = 'mine';
+let familyMembers = [];
+let shareTargetId = null;
 let shareTargetDoc = null; // full doc object for revocation list
 let searchDebounce = null;
 
@@ -21,7 +21,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setUserDisplay(firebase.auth().currentUser, null);
   }
 
+  // Wire confirm modal buttons (uses _resolveConfirm from utils.js)
+  document.getElementById('confirmModalOkBtn')    .addEventListener('click', () => _resolveConfirm(true));
+  document.getElementById('confirmModalCancelBtn').addEventListener('click', () => _resolveConfirm(false));
+  document.getElementById('confirmModalClose')    .addEventListener('click', () => _resolveConfirm(false));
+
   // Load stats and family concurrently, then docs
+
   loadStats();
   loadFamilyMembers();
   loadDocs();
@@ -81,12 +87,12 @@ async function loadStats() {
       apiFetch('/api/documents/shared-with-me'),
     ]);
     const s = statsRes.stats;
-    document.getElementById('statTotal').textContent   = s.totalDocs ?? 0;
+    document.getElementById('statTotal').textContent = s.totalDocs ?? 0;
     document.getElementById('statStorage').textContent = formatFileSize(s.totalSizeBytes ?? 0);
-    document.getElementById('statShared').textContent  = sharedRes.total ?? 0;
+    document.getElementById('statShared').textContent = sharedRes.total ?? 0;
     document.getElementById('docSubtitle').textContent =
       `${s.totalDocs ?? 0} documents · ${formatFileSize(s.totalSizeBytes ?? 0)} used`;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /* ── Family members (for share modal) ─────────────────────── */
@@ -111,10 +117,10 @@ async function loadDocs() {
     if (currentTab === 'shared') {
       res = await apiFetch('/api/documents/shared-with-me');
     } else {
-      const search   = document.getElementById('searchInput').value.trim();
+      const search = document.getElementById('searchInput').value.trim();
       const category = document.getElementById('categoryFilter').value;
-      const params   = new URLSearchParams();
-      if (search)   params.set('search', search);
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
       if (category) params.set('category', category);
       res = await apiFetch(`/api/documents?${params}`);
     }
@@ -162,7 +168,7 @@ function canPreview(mimeType) {
 function renderDocItem(doc) {
   const { icon, cls } = getFileIcon(doc.mimeType);
   const meta = getCategoryMeta(doc.category);
-  const isOwner   = currentTab !== 'shared';
+  const isOwner = currentTab !== 'shared';
   const previewable = canPreview(doc.mimeType);
 
   return `
@@ -175,8 +181,8 @@ function renderDocItem(doc) {
           <span class="doc-meta-item"><i class="fas fa-calendar-alt"></i>${formatDate(doc.uploadDate)}</span>
           <span class="doc-meta-item"><i class="fas fa-file"></i>${formatFileSize(doc.fileSize)}</span>
           ${doc.sharedWith && doc.sharedWith.length > 0
-            ? `<span class="badge badge-info"><i class="fas fa-share-alt"></i> Shared with ${doc.sharedWith.length}</span>`
-            : ''}
+      ? `<span class="badge badge-info"><i class="fas fa-share-alt"></i> Shared with ${doc.sharedWith.length}</span>`
+      : ''}
         </div>
       </div>
       <div class="doc-actions">
@@ -205,7 +211,20 @@ function renderDocItem(doc) {
 /* ── Preview ─────────────────────────────────────────────────── */
 
 async function previewDoc(id, title, mimeType) {
-  const modal   = document.getElementById('previewModal');
+  const isPDF = mimeType === 'application/pdf';
+
+  // PDFs: open in new tab — avoids CSP frame-src constraint for storage.googleapis.com
+  if (isPDF) {
+    try {
+      const res = await apiFetch(`/api/documents/${id}/download`);
+      window.open(res.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      showToast('Could not open PDF: ' + err.message, 'error');
+    }
+    return;
+  }
+
+  // Images: render inline in preview modal
   const frame   = document.getElementById('previewFrame');
   const img     = document.getElementById('previewImage');
   const spinner = document.getElementById('previewSpinner');
@@ -218,28 +237,21 @@ async function previewDoc(id, title, mimeType) {
   frame.src             = '';
   img.src               = '';
   label.textContent     = title;
+  document.getElementById('previewError').style.display = 'none';
 
   openModal('previewModal');
 
   try {
     const res = await apiFetch(`/api/documents/${id}/download`);
     spinner.style.display = 'none';
-
-    if (mimeType === 'application/pdf') {
-      frame.src           = res.url;
-      frame.style.display = '';
-    } else {
-      // image/*
-      img.src             = res.url;
-      img.alt             = title;
-      img.style.display   = '';
-    }
+    img.src           = res.url;
+    img.alt           = title;
+    img.style.display = '';
   } catch (err) {
     spinner.style.display = 'none';
-    frame.style.display   = 'none';
-    img.style.display     = 'none';
-    document.getElementById('previewError').style.display = '';
-    document.getElementById('previewError').textContent   = 'Preview failed: ' + err.message;
+    const errEl = document.getElementById('previewError');
+    errEl.style.display = '';
+    errEl.textContent   = 'Preview failed: ' + err.message;
   }
 }
 
@@ -248,14 +260,14 @@ async function previewDoc(id, title, mimeType) {
 async function handleUpload(e) {
   e.preventDefault();
   const fileInput = document.getElementById('uploadFile');
-  const title     = document.getElementById('uploadTitle').value.trim();
-  const category  = document.getElementById('uploadCategory').value;
-  const desc      = document.getElementById('uploadDesc').value.trim();
-  const btn       = document.getElementById('uploadSubmitBtn');
+  const title = document.getElementById('uploadTitle').value.trim();
+  const category = document.getElementById('uploadCategory').value;
+  const desc = document.getElementById('uploadDesc').value.trim();
+  const btn = document.getElementById('uploadSubmitBtn');
 
   if (!fileInput.files[0]) { showToast('Please select a file', 'warning'); return; }
-  if (!title)               { showToast('Title is required', 'warning');   return; }
-  if (!category)            { showToast('Please select a category', 'warning'); return; }
+  if (!title) { showToast('Title is required', 'warning'); return; }
+  if (!category) { showToast('Please select a category', 'warning'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Uploading…';
@@ -319,10 +331,10 @@ async function deleteDoc(id, title) {
 function openShareModal(doc) {
   // Accept either a doc object (from renderDocItem) or a plain id string (legacy)
   if (typeof doc === 'string') {
-    shareTargetId  = doc;
+    shareTargetId = doc;
     shareTargetDoc = null;
   } else {
-    shareTargetId  = doc.id;
+    shareTargetId = doc.id;
     shareTargetDoc = doc;
   }
 

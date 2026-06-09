@@ -283,6 +283,9 @@ function openInviteModal(groupId) {
   openModal('inviteModal');
 }
 
+// Invite timeout — Render free tier can cold-start for 20–30s
+const INVITE_TIMEOUT_MS = 35_000;
+
 async function handleInvite(e) {
   e.preventDefault();
   if (!inviteGroupId) { showToast('No group selected', 'error'); return; }
@@ -294,28 +297,51 @@ async function handleInvite(e) {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Sending…';
 
-  try {
-    const res = await apiFetch('/api/family/invite', {
-      method: 'POST',
-      body: JSON.stringify({ email, groupId: inviteGroupId, role }),
-    });
+  // Build a timeout promise that rejects with a recognisable sentinel
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(Object.assign(new Error('__INVITE_TIMEOUT__'), { isTimeout: true })),
+      INVITE_TIMEOUT_MS
+    );
+  });
 
-    // Reset button and close modal BEFORE any async work
+  try {
+    const res = await Promise.race([
+      apiFetch('/api/family/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email, groupId: inviteGroupId, role }),
+      }),
+      timeoutPromise,
+    ]);
+
+    // Success — reset UI before any async background work
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Invitation';
     closeModal('inviteModal');
 
     showToast(res.message || `Invitation sent to ${email}`, 'success');
 
-    // If email not configured, show the token for testing
+    // Dev hint when email transport is not configured
     if (res.invitation && res.invitation.emailSent === false) {
-      showToast(`Dev: check server console for invitation link`, 'info');
+      showToast('Dev: check server console for invitation link', 'info');
     }
 
-    // Reload in background — don't await so UI isn't blocked
+    // Reload invitations in background — don't await
     loadInvitations();
   } catch (err) {
-    showToast(err.message, 'error');
+    if (err.isTimeout) {
+      // Cold-start timeout — invite may still succeed on the backend
+      closeModal('inviteModal');
+      showToast(
+        'This is taking longer than expected. The invitation may still be sending — check back in a moment.',
+        'warning'
+      );
+    } else {
+      showToast(err.message || 'Failed to send invitation.', 'error');
+    }
+  } finally {
+    clearTimeout(timeoutId);
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Invitation';
   }
